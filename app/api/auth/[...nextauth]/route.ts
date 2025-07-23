@@ -1,10 +1,10 @@
-import NextAuth from "next-auth";
+import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcrypt";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 
-const authOptions = {
+const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: "credentials",
@@ -29,10 +29,16 @@ const authOptions = {
       },
     }),
   ],
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt" }, 
   secret: process.env.NEXTAUTH_SECRET,
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({
+      token,
+      user,
+    }: {
+      token: any;
+      user?: any;
+    }) {
       if (user) {
         token.id = user.id;
         token.name = user.name;
@@ -40,7 +46,13 @@ const authOptions = {
       }
       return token;
     },
-    async session({ session, token }) {
+    async session({
+      session,
+      token,
+    }: {
+      session: any;
+      token: any;
+    }) {
       if (session.user) {
         session.user.id = token.id;
         session.user.name = token.name;
@@ -52,5 +64,4 @@ const authOptions = {
 };
 
 const handler = NextAuth(authOptions);
-
 export { handler as GET, handler as POST };
