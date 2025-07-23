@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import { FaCalculator } from 'react-icons/fa6';
+import { FaCalculator } from 'react-icons/fa';
 import { Cog6ToothIcon, StarIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useSidebar } from '@/app/context/SidebarContext';
