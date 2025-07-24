@@ -1,15 +1,11 @@
 'use client';
 
-
 import { LineChart, Line, YAxis, ResponsiveContainer } from 'recharts';
-import { useEffect, useState } from 'react';
 import { Coin } from './CoinSection';
 
 type Props = {
   coin: Coin;
 };
-
-
 
 export default function CoinCard({ coin }: Props) {
   const history = coin.sparkline_in_7d.price.map((price, i) => ({
@@ -24,23 +20,26 @@ export default function CoinCard({ coin }: Props) {
   const changeColor = parseFloat(change) >= 0 ? 'text-green-400' : 'text-red-400';
 
   return (
-    <div className="flex justify-between items-center py-4 border-b border-zinc-700 text-white text-sm">
-      <p className="w-10 text-zinc-400">{coin.market_cap_rank}</p>
+    <div className="grid grid-cols-4 md:grid-cols-7 items-center gap-2 sm:gap-4 py-4 border-b border-zinc-700 text-white text-[11px] sm:text-sm">
+      <p className="text-zinc-400">{coin.market_cap_rank}</p>
 
-      <div className="w-40 flex items-center gap-2">
-        <img src={coin.image} className="w-6 h-6" alt={coin.symbol} />
+      <div className="flex items-center gap-2">
+        <img src={coin.image} className="w-5 h-5 sm:w-6 sm:h-6" alt={coin.symbol} />
         <div>
-          <span>{coin.name}</span>
-          <div className="text-xs text-zinc-400">({coin.symbol.toUpperCase()})</div>
+          <p className="leading-none">{coin.name}</p>
+          <p className="text-[10px] text-zinc-400 leading-none">({coin.symbol.toUpperCase()})</p>
         </div>
       </div>
 
-      <p className="w-24 text-right">${price}</p>
-      <p className={`w-20 text-right ${changeColor}`}>{change}%</p>
-      <p className="w-28 text-right">{marketCap}</p>
-      <p className="w-28 text-right">{volume}</p>
+      <p className="text-right">${coin.current_price.toFixed(2)}</p>
+      <p className={`text-right ${parseFloat(change) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+        {change}%
+      </p>
 
-      <div className="w-32 h-10 ml-4">
+      <p className="text-right hidden md:block">{marketCap}</p>
+      <p className="text-right hidden md:block">{volume}</p>
+
+      <div className="h-8 hidden md:block">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={history} margin={{ top: 5, right: 0, bottom: 5, left: 0 }}>
             <YAxis domain={['dataMin', 'dataMax']} hide />

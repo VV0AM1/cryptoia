@@ -1,4 +1,5 @@
 'use client';
+
 import { useState, useEffect } from 'react';
 import CoinCard from './CoinCard';
 import { useSidebar } from '@/app/context/SidebarContext';
@@ -33,7 +34,7 @@ export default function CoinSection() {
         })
         .then((data) => {
           if (isMounted) {
-            setAssets(data.assets); 
+            setAssets(data.assets);
             setLoading(false);
             setError('');
           }
@@ -46,37 +47,43 @@ export default function CoinSection() {
         });
     };
 
-    fetchData(); 
+    fetchData();
     const interval = setInterval(fetchData, 30000);
 
     return () => {
       isMounted = false;
-      clearInterval(interval); 
+      clearInterval(interval);
     };
   }, []);
 
+  const marginLeft = isOpened ? 'md:ml-[300px]' : 'md:ml-[80px]';
+  const contentWidth = 'w-full lg:w-[calc(100%-300px)]';
 
-  const marginLeft = isOpened ? 'ml-[300px]' : 'ml-[80px]'; 
-  const contentWidth = 'w-[calc(100%-300px)]'; 
-
-  if (loading) return <div className={`w-5/6 ${marginLeft} h-screen flex items-center justify-center`}><p>Loading...</p></div>;
-  if (error) return <p>{error}</p>;
-
+  if (loading) {
     return (
-    <div className={`flex flex-col ${marginLeft} ${contentWidth} max-w-6xl bg-zinc-800 p-8 rounded-3xl`}>
-        <div className="flex justify-between items-center py-2 text-xs text-zinc-400 border-b border-zinc-600">
-            <p className="w-10">#</p>
-            <p className="w-40">Asset</p>
-            <p className="w-24 text-right">Price</p>
-            <p className="w-20 text-right">24h %</p>
-            <p className="w-28 text-right">Market Cap</p>
-            <p className="w-28 text-right">24h Volume</p>
-            <p className="w-32 text-right">7d Chart</p>
-        </div>
-
-        {assets.map((coin) => (
-        <CoinCard key={coin.id} coin={coin} />
-        ))}
-    </div>
+      <div className={`w-full ${marginLeft} h-screen flex items-center justify-center`}>
+        <p className="text-white">Loading...</p>
+      </div>
     );
+  }
+
+  if (error) return <p className="text-red-500">{error}</p>;
+
+  return (
+    <div className={`flex flex-col ${marginLeft} ${contentWidth} max-w-7xl bg-zinc-800 p-4 sm:p-6 md:p-8 rounded-3xl overflow-x-auto`}>
+      <div className="grid grid-cols-4 md:grid-cols-7 gap-2 sm:gap-4 py-2 text-[10px] sm:text-xs text-zinc-400 border-b border-zinc-600">
+        <p>#</p>
+        <p>Asset</p>
+        <p className="text-right">Price</p>
+        <p className="text-right">24h %</p>
+        <p className="text-right hidden md:block">Market Cap</p>
+        <p className="text-right hidden md:block">24h Volume</p>
+        <p className="text-right hidden md:block">7d Chart</p>
+      </div>
+
+      {assets.map((coin) => (
+        <CoinCard key={coin.id} coin={coin} />
+      ))}
+    </div>
+  );
 }

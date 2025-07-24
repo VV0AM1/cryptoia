@@ -3,7 +3,7 @@ import CoinSection from "@/components/CoinSection";
 
 export default function Home() {
   return (
-    <div className="w-full min-h-screen px-4 py-12 bg-zinc-900 flex justify-center">
+    <div className="w-full min-h-screen bg-zinc-900 flex justify-center items-start px-2 sm:px-6 py-12">
       <CoinSection />
     </div>
   );
