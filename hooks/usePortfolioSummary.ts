@@ -17,7 +17,7 @@ export function usePortfolioSummary() {
   useEffect(() => {
     async function fetchSummary() {
       try {
-        const res = await fetch('/api/portfolio/summary');
+        const res = await fetch('/api/portfolio/');
         if (!res.ok) throw new Error('Failed to fetch portfolio');
         const data = await res.json();
         setSummary(data);
