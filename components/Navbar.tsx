@@ -7,7 +7,7 @@ import { Star, Settings, UserCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useSidebar } from '@/app/context/SidebarContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { usePortfolioSummary } from '../../hooks/usePortfolioSummary'; 
+import { usePortfolioSummary } from '@/hooks/usePortfolioSummary'; 
 
 export default function NavBar() {
   const [coinName, setCoinName] = useState('');
