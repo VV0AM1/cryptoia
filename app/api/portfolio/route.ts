@@ -1,14 +1,16 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
+import { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import axios from 'axios';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export async function GET(req: NextRequest) {
   const token = await getToken({ req });
 
   if (!token || !token.email) {
-    return res.status(401).json({ message: 'Unauthorized' });
+    return new Response(JSON.stringify({ message: 'Unauthorized' }), {
+      status: 401,
+    });
   }
 
   try {
@@ -17,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const user = await User.findOne({ email: token.email }).lean();
 
     if (!user?.coins || user.coins.length === 0) {
-      return res.status(200).json({
+      return Response.json({
         totalCurrentValue: 0,
         totalProfit: 0,
         percentageChange24h: 0,
@@ -58,13 +60,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const percentageChange24h =
       totalInvested === 0 ? 0 : (totalProfit / totalInvested) * 100;
 
-    res.status(200).json({
+    return Response.json({
       totalCurrentValue,
       totalProfit,
       percentageChange24h,
     });
   } catch (error) {
     console.error('[Portfolio Summary Error]', error);
-    res.status(500).json({ message: 'Internal server error' });
+    return new Response(JSON.stringify({ message: 'Internal server error' }), {
+      status: 500,
+    });
   }
 }
