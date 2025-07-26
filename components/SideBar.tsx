@@ -168,7 +168,7 @@ export default function SideBar() {
           </div>
         )}
 
-        <div className="flex space-x-4 mt-4">
+        <div className="flex space-x-4 ">
           <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-100 transition">
             <FaInstagram className="w-6 h-6" />
           </a>

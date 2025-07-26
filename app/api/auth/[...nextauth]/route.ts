@@ -2,7 +2,7 @@ import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcrypt";
 import { connectToDatabase } from "@/lib/db";
-import User from "@/models/User";
+import {User} from "@/models/User";
 
 const authOptions: NextAuthOptions = {
   providers: [
@@ -18,11 +18,12 @@ const authOptions: NextAuthOptions = {
         const user = await User.findOne({ email: credentials?.email });
         if (!user) throw new Error("User not found");
 
-        const isValid = await compare(credentials!.password, user.password);
+        if (!credentials?.password) throw new Error("Password is required");
+        const isValid = await compare(credentials.password, user.password!);
         if (!isValid) throw new Error("Invalid password");
 
         return {
-          id: user._id.toString(),
+          id: (user._id as unknown as string),
           name: user.name,
           email: user.email,
         };
