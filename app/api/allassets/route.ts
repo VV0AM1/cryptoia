@@ -1,99 +1,74 @@
 import { NextRequest, NextResponse } from 'next/server';
-import axios from '@/lib/axiosBinance';
-import symbolMapRaw from '@/data/symbolMap.json' assert { type: 'json' };
-import marketCapMapRaw from '@/data/marketCapMap.json' assert { type: 'json' };
 
-// Force Node runtime + no caching — avoids Edge/ESM pitfalls and ISR caching of errors
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-type SymbolMeta = { name: string; image: string };
-type MarketCapMap = Record<string, number>;
-
 export async function GET(_req: NextRequest) {
   try {
-    // Ensure axiosBinance has a valid baseURL in prod
-    // (If axiosBinance relies on env vars, make sure they are set in your host)
-    const { data: stats } = await axios.get('/ticker/24hr', {
-      // Always safe to send a UA; some providers like it
-      headers: { 'User-Agent': 'YourApp/1.0' },
-      timeout: 15000,
+    const headers: Record<string, string> = { 'User-Agent': 'YourApp/1.0' };
+
+    if (process.env.COINGECKO_API_KEY) {
+      headers['x-cg-demo-api-key'] = process.env.COINGECKO_API_KEY as string;
+    }
+
+    const url =
+      'https://api.coingecko.com/api/v3/coins/markets' +
+      '?vs_currency=usd' +
+      '&order=market_cap_desc' +
+      '&per_page=250' +
+      '&page=1' +
+      '&sparkline=true' +
+      '&price_change_percentage=24h,7d';
+
+    const res = await fetch(url, {
+      headers,
+      cache: 'no-store',
     });
 
-    const symbolMap = symbolMapRaw as Record<string, SymbolMeta>;
-    const marketCapMap = marketCapMapRaw as MarketCapMap;
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      console.error('[allassets] CG response not ok:', res.status, text);
+      return NextResponse.json({ error: 'CoinGecko upstream error' }, { status: 502 });
+    }
 
-    // Only USDT pairs
-    const usdtAssets = (Array.isArray(stats) ? stats : []).filter(
-      (asset: any) => typeof asset?.symbol === 'string' && asset.symbol.endsWith('USDT')
-    );
+    const data = await res.json();
 
-    // Sort by your precomputed market cap map (stable + deterministic)
-    const sortedAssets = usdtAssets
-      .filter((asset: any) => marketCapMap[asset.symbol])
-      .sort((a: any, b: any) => marketCapMap[b.symbol] - marketCapMap[a.symbol]);
+    const top = (Array.isArray(data) ? data : []).slice(0, 15).map((c: any) => {
+      const binanceLikeSymbol = (String(c.symbol || '') + 'USDT').toUpperCase();
 
-    const topAssetsRaw = sortedAssets.slice(0, 15);
-
-    // Fetch 7d sparkline via klines; if it fails for some symbol, we’ll just skip sparkline
-    const topAssets = await Promise.all(
-      topAssetsRaw.map(async (asset: any) => {
-        const symbol: string = asset.symbol;
-        const meta: SymbolMeta = symbolMap[symbol] || {
-          name: symbol.replace('USDT', ''),
-          image: '/default-coin.png',
-        };
-
-        const marketCap = marketCapMap[symbol] || 0;
-        let sparkline: number[] = [];
-        let price_change_percentage_7d_in_currency = 0;
-
-        try {
-          const { data: klineData } = await axios.get('/klines', {
-            params: { symbol, interval: '1h', limit: 168 },
-            headers: { 'User-Agent': 'YourApp/1.0' },
-            timeout: 15000,
-          });
-
-          if (Array.isArray(klineData)) {
-            sparkline = klineData.map((k: any) => parseFloat(k?.[4])).filter((n: any) => !Number.isNaN(n));
-            const first = sparkline[0];
-            const last = sparkline[sparkline.length - 1];
-            if (first && last) {
-              price_change_percentage_7d_in_currency = ((last - first) / first) * 100;
-            }
-          }
-        } catch (err) {
-          console.warn(`⚠️ Failed to fetch klines for ${symbol}`, err);
-        }
-
-        return {
-          id: symbol,
-          symbol: symbol.replace('USDT', ''),
-          name: meta.name,
-          image: meta.image,
-          current_price: parseFloat(asset.lastPrice ?? '0'),
-          price_change_percentage_24h: parseFloat(asset.priceChangePercent ?? '0'),
-          price_change_percentage_7d_in_currency,
-          market_cap: marketCap,
-          total_volume: parseFloat(asset.quoteVolume ?? '0'),
-          sparkline_in_7d: { price: sparkline },
-        };
-      })
-    );
+      return {
+        id: binanceLikeSymbol,
+        symbol: String(c.symbol || '').toUpperCase(),
+        name: c.name ?? binanceLikeSymbol,
+        image: c.image ?? '/default-coin.png',
+        current_price: Number(c.current_price ?? 0),
+        price_change_percentage_24h: Number(
+          c.price_change_percentage_24h_in_currency ??
+            c.price_change_percentage_24h ??
+            0
+        ),
+        price_change_percentage_7d_in_currency: Number(
+          c.price_change_percentage_7d_in_currency ?? 0
+        ),
+        market_cap: Number(c.market_cap ?? 0),
+        total_volume: Number(c.total_volume ?? 0),
+        sparkline_in_7d: {
+          price: Array.isArray(c.sparkline_in_7d?.price)
+            ? c.sparkline_in_7d.price
+                .map((n: any) => Number(n))
+                .filter((n: any) => !Number.isNaN(n))
+            : [],
+        },
+      };
+    });
 
     return NextResponse.json({
       fetchedAt: new Date().toISOString(),
-      assets: topAssets,
+      assets: top,
     });
   } catch (error: any) {
-    // Log extra info in prod logs
-    console.error('[API /allassets] Failed:', {
-      message: error?.message,
-      responseStatus: error?.response?.status,
-      responseData: error?.response?.data,
-    });
+    console.error('[API /allassets] Failed:', error?.message || error);
     return NextResponse.json({ error: 'Failed to fetch assets' }, { status: 500 });
   }
 }

@@ -24,6 +24,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
+
     "incremental": true,
     "plugins": [
       {
@@ -42,7 +43,7 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts"
-  ],
+, "scripts/fetchMarketCaps.js"  ],
   "exclude": [
     "node_modules"
   ]
