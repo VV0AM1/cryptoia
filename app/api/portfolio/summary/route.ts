@@ -3,11 +3,13 @@ import { getToken } from 'next-auth/jwt';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import axios from 'axios';
+import rawSymbolMap from '@/data/symbolMap.json';
+
 
 export async function GET(req: NextRequest) {
   const token = await getToken({ req });
 
-  if (!token || !token.email) {
+  if (!token?.email) {
     return new Response(JSON.stringify({ message: 'Unauthorized' }), {
       status: 401,
     });
@@ -18,7 +20,7 @@ export async function GET(req: NextRequest) {
 
     const user = await User.findOne({ email: token.email }).lean();
 
-    if (!user?.coins || user.coins.length === 0) {
+    if (!user?.coins?.length) {
       return Response.json({
         totalCurrentValue: 0,
         totalProfit: 0,
@@ -26,13 +28,23 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const coinSymbols = user.coins.map((c: any) => c.symbol.toLowerCase());
+    const ids = user.coins
+      .map((coin) => coin.coinId)
+      .filter(Boolean);
 
-    const { data: marketData } = await axios.get(
+    if (!ids.length) {
+      return Response.json({
+        totalCurrentValue: 0,
+        totalProfit: 0,
+        percentageChange24h: 0,
+      });
+    }
+
+    const { data: priceData } = await axios.get(
       'https://api.coingecko.com/api/v3/simple/price',
       {
         params: {
-          ids: coinSymbols.join(','),
+          ids: ids.join(','),
           vs_currencies: 'usd',
           include_24hr_change: 'true',
         },
@@ -41,29 +53,27 @@ export async function GET(req: NextRequest) {
 
     let totalInvested = 0;
     let totalCurrentValue = 0;
-    let totalProfit = 0;
 
-    for (const coin of user.coins) {
-      const symbol = coin.symbol.toLowerCase();
-      const live = marketData[symbol];
-      if (!live) continue;
+    user.coins.forEach((coin) => {
+      const current = priceData[coin.coinId];
+      if (!current) return;
 
-      const currentValue = live.usd * coin.quantity;
+      const currentPrice = current.usd;
       const investedValue = coin.averagePrice * coin.quantity;
-      const profit = currentValue - investedValue;
+      const currentValue = currentPrice * coin.quantity;
 
-      totalCurrentValue += currentValue;
       totalInvested += investedValue;
-      totalProfit += profit;
-    }
+      totalCurrentValue += currentValue;
+    });
 
+    const totalProfit = totalCurrentValue - totalInvested;
     const percentageChange24h =
       totalInvested === 0 ? 0 : (totalProfit / totalInvested) * 100;
 
     return Response.json({
-      totalCurrentValue,
-      totalProfit,
-      percentageChange24h,
+      totalCurrentValue: +totalCurrentValue.toFixed(2),
+      totalProfit: +totalProfit.toFixed(2),
+      percentageChange24h: +percentageChange24h.toFixed(2),
     });
   } catch (error) {
     console.error('[Portfolio Summary Error]', error);

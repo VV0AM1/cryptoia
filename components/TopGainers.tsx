@@ -11,7 +11,10 @@ export default function TopGainers() {
   useEffect(() => {
     const delay = setTimeout(() => {
       getAssets().then((data) => {
-        const sorted = [...data].sort((a, b) => b.price_change_percentage_24h - a.price_change_percentage_24h);
+        const filtered = data.filter((c: Coin) => c.id.endsWith('USDT'));
+        const sorted = [...filtered].sort(
+          (a, b) => b.price_change_percentage_24h - a.price_change_percentage_24h
+        );
         setCoins(sorted.slice(0, 5));
         setLoading(false);
       });
@@ -35,7 +38,10 @@ export default function TopGainers() {
       </div>
       <ul className="text-sm divide-y divide-zinc-700">
         {coins.map((coin) => (
-          <li key={coin.id} className="py-2 flex justify-between items-center hover:bg-zinc-700/40 px-2 rounded-lg transition-all">
+          <li
+            key={coin.id}
+            className="py-2 flex justify-between items-center hover:bg-zinc-700/40 px-2 rounded-lg transition-all"
+          >
             <div className="flex items-center gap-2">
               <img src={coin.image} alt={coin.name} className="w-5 h-5" />
               <span className="text-white font-medium">{coin.symbol.toUpperCase()}</span>
@@ -49,4 +55,4 @@ export default function TopGainers() {
       </ul>
     </div>
   );
-}        
+}

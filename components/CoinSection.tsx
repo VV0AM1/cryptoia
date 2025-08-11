@@ -66,7 +66,6 @@ export default function CoinSection() {
   if (loading) {
     return (
      <div className={`flex flex-col ${marginLeft} ${contentWidth} bg-zinc-800 p-4 sm:p-6 md:p-8 rounded-3xl`}>
-      {/* Header */}
       <div className="grid grid-cols-9 gap-4 items-center text-xs text-zinc-500 border-b border-zinc-700 pb-2">
         <p>#</p>
         <p></p>
@@ -79,7 +78,6 @@ export default function CoinSection() {
         <p className="text-right">7d Chart</p>
       </div>
 
-      {/* Skeleton Rows */}
       <div className="divide-y divide-zinc-700 mt-4 space-y-2 animate-pulse">
         {Array.from({ length: 10 }).map((_, i) => (
           <div key={i} className="grid grid-cols-9 gap-4 items-center py-4">

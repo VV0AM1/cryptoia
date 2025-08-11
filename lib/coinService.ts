@@ -1,30 +1,53 @@
-import axios from './axiosCoinGecko'
+import axios from './axiosBinance';
 
 export const getAssets = async () => {
-  const res = await axios.get('/coins/markets', {
-    params: {
-      vs_currency: 'usd',
-      order: 'market_cap_desc',
-      per_page: 10,
-      page: 1,
-      sparkline: true,
-    },
-  });
-  return res.data;
+  const { data } = await axios.get('/ticker/24hr');
+
+  return data.slice(0, 50).map((coin: any) => ({
+    id: coin.symbol,
+    symbol: coin.symbol,
+    name: coin.symbol, // You can map this from `symbolMap` if needed
+    image: `/icons/${coin.symbol}.png`, // or static/default
+    current_price: parseFloat(coin.lastPrice),
+    price_change_percentage_24h: parseFloat(coin.priceChangePercent),
+  }));
 };
 
-export const getAssetByName = async (id: string) => {
-  const res = await axios.get(`/coins/${id}`);
-  return res.data;
-};
+export const getAssetHistory = async (
+  symbol: string,
+  days: string = '7'
+) => {
+  const now = Date.now();
+  const oneDay = 24 * 60 * 60 * 1000;
+  const startTime = now - parseInt(days) * oneDay;
 
-export const getAssetHistory = async (id: string, days: string = '7') => {
-  const res = await axios.get(`/coins/${id}/market_chart`, {
+  const { data } = await axios.get('/klines', {
     params: {
-      vs_currency: 'usd',
-      days: days,
-      interval: 'daily',
+      symbol: symbol.toUpperCase(), // e.g. BTCUSDT
+      interval: '1d',
+      startTime,
+      endTime: now,
     },
   });
-  return res.data.prices.map(([time, price]: [number, number]) => ({ time, priceUsd: price }));
+
+  return data.map(([time, open, high, low, close]: any[]) => ({
+    time,
+    priceUsd: parseFloat(close),
+  }));
+};
+
+
+export const getAssetByName = async (symbol: string) => {
+  const { data } = await axios.get(`/ticker/24hr`, {
+    params: { symbol },
+  });
+
+  return {
+    id: symbol,
+    symbol: symbol,
+    name: symbol, // You could map this from a known list
+    image: `/placeholder.png`,
+    currentPrice: parseFloat(data.lastPrice),
+    priceChangePercentage24h: parseFloat(data.priceChangePercent),
+  };
 };
