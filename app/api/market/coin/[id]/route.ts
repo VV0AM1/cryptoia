@@ -1,25 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
+import rawSymbolMap from '@/data/symbolMap.json';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-type Params = { params: { id: string } };
+type SymbolMeta = { name: string; image: string; id?: string };
+const symbolMap = rawSymbolMap as Record<string, SymbolMeta>;
 
-export async function GET(_req: NextRequest, { params }: Params) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
-    const rawId = String(params?.id || '').toUpperCase().trim(); // e.g., BTCUSDT
+    const rawId = String(params?.id || '').toUpperCase().trim(); // e.g. BTCUSDT
     if (!rawId || !/^[A-Z0-9]+$/.test(rawId)) {
       return NextResponse.json({ error: 'Invalid symbol' }, { status: 400 });
     }
 
-    // Derive a base symbol from things like BTCUSDT, ETHUSDT, SOLUSDT, etc.
-    // If it ends with USDT/USDC/BUSD/FDUSD/TUSD, strip the quote asset.
+    // Derive the base symbol (BTC from BTCUSDT, etc.)
     const QUOTE_ASSETS = ['USDT', 'USDC', 'BUSD', 'FDUSD', 'TUSD', 'USD'];
     const quote = QUOTE_ASSETS.find(q => rawId.endsWith(q));
-    const baseSymbol = quote ? rawId.slice(0, -quote.length) : rawId; // e.g., BTC
+    const baseSymbol = quote ? rawId.slice(0, -quote.length) : rawId; // e.g. BTC
 
-    // 1) Price from Binance
+    // ---- Get name/symbol/image from your OWN json ----
+    const metaFromJson: SymbolMeta | undefined =
+      symbolMap[baseSymbol] ||
+      symbolMap[baseSymbol.toUpperCase()] ||
+      symbolMap[baseSymbol.toLowerCase()];
+
+    const symbol = baseSymbol; // what your UI expects
+    const name = metaFromJson?.name ?? baseSymbol;
+    const image = metaFromJson?.image ?? '/default-coin.png';
+    const cgId = metaFromJson?.id || ''; // CoinGecko id (optional, used only for price fallback)
+
+    // ---- Price from Binance (primary) ----
     let currentPrice = 0;
     try {
       const binanceRes = await fetch(
@@ -32,46 +47,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
         if (!Number.isNaN(p)) currentPrice = p;
       }
     } catch (e) {
-      // keep going; we'll still return name/image from CoinGecko
       console.error('[coin:id] Binance price fetch failed:', e);
     }
 
-    // 2) Name/Image (and a stable CoinGecko id) from CoinGecko Search
-    //    We look for the first exact symbol match (case-insensitive).
-    let cgId = '';
-    let name = baseSymbol;
-    let image = '/default-coin.png';
-
-    try {
-      const headers: Record<string, string> = { 'User-Agent': 'YourApp/1.0' };
-      if (process.env.COINGECKO_API_KEY) {
-        headers['x-cg-demo-api-key'] = process.env.COINGECKO_API_KEY;
-      }
-      const searchRes = await fetch(
-        `https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(baseSymbol)}`,
-        { headers, cache: 'no-store' }
-      );
-
-      if (searchRes.ok) {
-        const search = await searchRes.json();
-        const coins: any[] = Array.isArray(search?.coins) ? search.coins : [];
-
-        // Prefer exact symbol match; otherwise fall back to first hit
-        const exact =
-          coins.find(c => String(c?.symbol || '').toUpperCase() === baseSymbol.toUpperCase()) ||
-          coins[0];
-
-        if (exact) {
-          cgId = String(exact.id || '');
-          name = String(exact.name || name);
-          image = String(exact.thumb || image);
-        }
-      }
-    } catch (e) {
-      console.error('[coin:id] CoinGecko search failed:', e);
-    }
-
-    // Optional: If Binance price wasn’t available, try CoinGecko markets as a fallback
+    // ---- Fallback price from CoinGecko (uses cgId from your json) ----
     if (!currentPrice && cgId) {
       try {
         const headers: Record<string, string> = { 'User-Agent': 'YourApp/1.0' };
@@ -89,20 +68,17 @@ export async function GET(_req: NextRequest, { params }: Params) {
           const first = Array.isArray(arr) ? arr[0] : null;
           const p = Number(first?.current_price);
           if (!Number.isNaN(p)) currentPrice = p;
-          if (first?.image && image === '/default-coin.png') image = String(first.image);
-          if (first?.name) name = String(first.name);
         }
       } catch (e) {
         console.error('[coin:id] CoinGecko markets fallback failed:', e);
       }
     }
 
-    // Final shape expected by your front-end AddTransactionModal / NavBar
     return NextResponse.json({
-      id: rawId,                // keep the Binance-style id you pass in (e.g., BTCUSDT)
-      symbol: baseSymbol,       // e.g., BTC
-      name,                     // pretty name from CG (fallback: baseSymbol)
-      image,                    // icon/thumbnail from CG (fallback: default)
+      id: rawId,          // e.g., BTCUSDT (what your UI passes)
+      symbol,             // from your json key (base symbol)
+      name,               // from your json
+      image,              // from your json
       currentPrice: Number(currentPrice) || 0,
     });
   } catch (err: any) {
