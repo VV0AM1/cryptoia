@@ -28,7 +28,15 @@ export async function POST(req: NextRequest) {
     }
 
     const symbolMap = rawSymbolMap as Record<string, { name: string; image: string; id?: string }>;
-    const metadataEntry = Object.entries(symbolMap).find(([, meta]) => meta.id === coinId);
+
+    // Try match by CoinGecko ID
+    let metadataEntry = Object.entries(symbolMap).find(([, meta]) => meta.id === coinId);
+
+    // If not found, try match by the pair key directly (BTCUSDT, SOLUSDT, etc.)
+    if (!metadataEntry && symbolMap[coinId]) {
+      metadataEntry = [coinId, symbolMap[coinId]];
+    }
+
     if (!metadataEntry) {
       return NextResponse.json({ error: 'Unsupported asset' }, { status: 400 });
     }
