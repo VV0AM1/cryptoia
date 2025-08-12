@@ -5,80 +5,71 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-type SymbolMeta = { name: string; image: string; id?: string };
-const symbolMap = rawSymbolMap as Record<string, SymbolMeta>;
+type Meta = { id?: string; name: string; image: string };
+const symbolMap = rawSymbolMap as Record<string, Meta>;
 
 export async function GET(req: Request) {
   try {
-    // Extract [id] from the URL path (no typed context param needed)
+    // read [id] from URL to avoid Netlify typing issues
     const { pathname } = new URL(req.url);
-    const rawId = (pathname.split('/').pop() || '').toUpperCase(); // e.g., BTCUSDT
-
+    const rawId = (pathname.split('/').pop() || '').toUpperCase(); // e.g. BTCUSDT
     if (!rawId || !/^[A-Z0-9]+$/.test(rawId)) {
       return NextResponse.json({ error: 'Invalid symbol' }, { status: 400 });
     }
 
-    // Derive base symbol from common quote assets
-    const QUOTE_ASSETS = ['USDT', 'USDC', 'BUSD', 'FDUSD', 'TUSD', 'USD'];
-    const quote = QUOTE_ASSETS.find(q => rawId.endsWith(q));
-    const baseSymbol = quote ? rawId.slice(0, -quote.length) : rawId; // e.g., BTC
+    // use the pair key (BTCUSDT) for metadata
+    const meta = symbolMap[rawId];
 
-    // ---- Name/symbol/image from your own JSON ----
-    const meta: SymbolMeta | undefined =
-      symbolMap[baseSymbol] ||
-      symbolMap[baseSymbol.toUpperCase()] ||
-      symbolMap[baseSymbol.toLowerCase()];
+    // derive base symbol only for the "symbol" field
+    const QUOTES = ['USDT', 'USDC', 'BUSD', 'FDUSD', 'TUSD', 'USD'];
+    const quote = QUOTES.find(q => rawId.endsWith(q));
+    const baseSymbol = quote ? rawId.slice(0, -quote.length) : rawId;
 
-    const symbol = baseSymbol;
-    const name = meta?.name ?? baseSymbol;
-    const image = meta?.image ?? '/default-coin.png';
-    const cgId = meta?.id || ''; // optional CoinGecko id
+    let name = meta?.name ?? baseSymbol;
+    let image = meta?.image ?? '/default-coin.png';
+    const cgId = meta?.id || '';
 
-    // ---- Price from Binance (primary) ----
+    // price from Binance (primary)
     let currentPrice = 0;
     try {
-      const binanceRes = await fetch(
+      const r = await fetch(
         `https://api.binance.com/api/v3/ticker/price?symbol=${encodeURIComponent(rawId)}`,
         { cache: 'no-store' }
       );
-      if (binanceRes.ok) {
-        const j = await binanceRes.json();
+      if (r.ok) {
+        const j = await r.json();
         const p = Number(j?.price);
         if (!Number.isNaN(p)) currentPrice = p;
       }
     } catch (e) {
-      console.error('[coin:id] Binance price fetch failed:', e);
+      console.error('[coin:id] Binance fetch failed:', e);
     }
 
-    // ---- Fallback price from CoinGecko (only if Binance missing) ----
+    // fallback price from CoinGecko if Binance lacks the pair
     if (!currentPrice && cgId) {
       try {
         const headers: Record<string, string> = { 'User-Agent': 'YourApp/1.0' };
-        if (process.env.COINGECKO_API_KEY) {
-          headers['x-cg-demo-api-key'] = process.env.COINGECKO_API_KEY;
-        }
-        const mktRes = await fetch(
-          `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${encodeURIComponent(
-            cgId
-          )}`,
+        if (process.env.COINGECKO_API_KEY) headers['x-cg-demo-api-key'] = process.env.COINGECKO_API_KEY;
+        const r = await fetch(
+          `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${encodeURIComponent(cgId)}`,
           { headers, cache: 'no-store' }
         );
-        if (mktRes.ok) {
-          const arr = await mktRes.json();
+        if (r.ok) {
+          const arr = await r.json();
           const first = Array.isArray(arr) ? arr[0] : null;
           const p = Number(first?.current_price);
           if (!Number.isNaN(p)) currentPrice = p;
         }
       } catch (e) {
-        console.error('[coin:id] CoinGecko markets fallback failed:', e);
+        console.error('[coin:id] CG fallback failed:', e);
       }
     }
 
     return NextResponse.json({
-      id: rawId,          // e.g., BTCUSDT
-      symbol,             // e.g., BTC (from your json key)
-      name,               // from your json
-      image,              // from your json
+      id: rawId,                 // BTCUSDT (pair)
+      symbol: baseSymbol,        // BTC (base)
+      name,                      // from your JSON
+      image,                     // from your JSON
       currentPrice: Number(currentPrice) || 0,
     });
   } catch (err: any) {
