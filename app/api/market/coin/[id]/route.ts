@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import rawSymbolMap from '@/data/symbolMap.json';
 
 export const runtime = 'nodejs';
@@ -8,31 +8,31 @@ export const revalidate = 0;
 type SymbolMeta = { name: string; image: string; id?: string };
 const symbolMap = rawSymbolMap as Record<string, SymbolMeta>;
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: Request) {
   try {
-    const rawId = String(params?.id || '').toUpperCase().trim(); // e.g. BTCUSDT
+    // Extract [id] from the URL path (no typed context param needed)
+    const { pathname } = new URL(req.url);
+    const rawId = (pathname.split('/').pop() || '').toUpperCase(); // e.g., BTCUSDT
+
     if (!rawId || !/^[A-Z0-9]+$/.test(rawId)) {
       return NextResponse.json({ error: 'Invalid symbol' }, { status: 400 });
     }
 
-    // Derive the base symbol (BTC from BTCUSDT, etc.)
+    // Derive base symbol from common quote assets
     const QUOTE_ASSETS = ['USDT', 'USDC', 'BUSD', 'FDUSD', 'TUSD', 'USD'];
     const quote = QUOTE_ASSETS.find(q => rawId.endsWith(q));
-    const baseSymbol = quote ? rawId.slice(0, -quote.length) : rawId; // e.g. BTC
+    const baseSymbol = quote ? rawId.slice(0, -quote.length) : rawId; // e.g., BTC
 
-    // ---- Get name/symbol/image from your OWN json ----
-    const metaFromJson: SymbolMeta | undefined =
+    // ---- Name/symbol/image from your own JSON ----
+    const meta: SymbolMeta | undefined =
       symbolMap[baseSymbol] ||
       symbolMap[baseSymbol.toUpperCase()] ||
       symbolMap[baseSymbol.toLowerCase()];
 
-    const symbol = baseSymbol; // what your UI expects
-    const name = metaFromJson?.name ?? baseSymbol;
-    const image = metaFromJson?.image ?? '/default-coin.png';
-    const cgId = metaFromJson?.id || ''; // CoinGecko id (optional, used only for price fallback)
+    const symbol = baseSymbol;
+    const name = meta?.name ?? baseSymbol;
+    const image = meta?.image ?? '/default-coin.png';
+    const cgId = meta?.id || ''; // optional CoinGecko id
 
     // ---- Price from Binance (primary) ----
     let currentPrice = 0;
@@ -50,7 +50,7 @@ export async function GET(
       console.error('[coin:id] Binance price fetch failed:', e);
     }
 
-    // ---- Fallback price from CoinGecko (uses cgId from your json) ----
+    // ---- Fallback price from CoinGecko (only if Binance missing) ----
     if (!currentPrice && cgId) {
       try {
         const headers: Record<string, string> = { 'User-Agent': 'YourApp/1.0' };
@@ -75,8 +75,8 @@ export async function GET(
     }
 
     return NextResponse.json({
-      id: rawId,          // e.g., BTCUSDT (what your UI passes)
-      symbol,             // from your json key (base symbol)
+      id: rawId,          // e.g., BTCUSDT
+      symbol,             // e.g., BTC (from your json key)
       name,               // from your json
       image,              // from your json
       currentPrice: Number(currentPrice) || 0,
