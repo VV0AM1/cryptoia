@@ -33,17 +33,10 @@ async function fetchBinance(symbol: string) {
   };
 }
 
-// Accept either a plain params object (Next default) or a Promise (Netlify typing)
-type Params = { symbol: string };
-type MaybePromise<T> = T | Promise<T>;
-
-export default async function Page({
-  params,
-}: {
-  params: MaybePromise<Params>;
-}) {
-  const p = await Promise.resolve(params); // normalize
-  const symbol = (p.symbol || "").toUpperCase();
+// NOTE: use `any` to satisfy Netlify's PageProps constraint (params may be a Promise)
+export default async function Page(props: any) {
+  const params = await props?.params; // works for Promise or plain object
+  const symbol = String(params?.symbol ?? "").toUpperCase();
 
   const meta = symbolMap[symbol];
   if (!meta) notFound();
