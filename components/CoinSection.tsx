@@ -44,7 +44,7 @@ export default function CoinSection() {
     };
 
     fetchData();
-    const id = setInterval(fetchData, 30_000);
+    const id = setInterval(fetchData, 300_000);
     return () => {
       alive = false;
       clearInterval(id);
