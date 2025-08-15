@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import Image from 'next/image';
@@ -8,75 +8,115 @@ import { usePortfolioSummary } from '@/hooks/usePortfolioSummary';
 
 type Props = {
   coin: {
+    id: string;         
+    symbol: string;    
     name: string;
-    symbol: string;
     image: string;
-    id: string;
     currentPrice: number;
   };
-  refetch: () => void;
   onClose: () => void;
-  onSubmit: (tx: any) => void;
+  onSubmit: (tx?: any) => void;
+};
+
+type HoldingRow = {
+  symbol: string;          
+  coinId?: string;         
+  quantity: number;
 };
 
 export default function AddTransactionModal({ coin, onClose, onSubmit }: Props) {
   const [type, setType] = useState<'buy' | 'sell' | 'transfer'>('buy');
   const [priceMode, setPriceMode] = useState<'market' | 'custom'>('market');
-  const [amount, setAmount] = useState('');
-  const [price, setPrice] = useState(coin.currentPrice.toString());
+
+  const [amount, setAmount] = useState('');      
+  const [price, setPrice] = useState(String(coin.currentPrice));
   const [total, setTotal] = useState('');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 16));
+  const [submitting, setSubmitting] = useState(false);
+
   const { refetch } = usePortfolioSummary();
 
-  useEffect(() => {
-    const a = parseFloat(amount);
-    const p = parseFloat(price);
-    const t = parseFloat(total);
+  const [holdingQty, setHoldingQty] = useState<number>(0);
 
-    if (!isNaN(a) && !isNaN(p) && document.activeElement?.id !== 'total') {
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch('/api/portfolio/coins', { cache: 'no-store' });
+        const rows: HoldingRow[] = await r.json();
+        const up = (s?: string) => (s || '').toUpperCase().trim();
+
+        const match =
+          rows.find((c) => up(c.symbol) === up(coin.id)) ||              
+          rows.find((c) => up(c.coinId) === up(coin.id)) ||          
+          rows.find((c) => up(c.symbol) === up(`${coin.symbol}USDT`)) || 
+          rows.find((c) => up(c.symbol) === up(coin.symbol)) ||
+          rows.find((c) => up(c.coinId) === up(coin.symbol));
+
+        if (alive) setHoldingQty(Number(match?.quantity || 0));
+      } catch {
+        if (alive) setHoldingQty(0);
+      }
+    })();
+    return () => { alive = false; };
+  }, [coin.id, coin.symbol]);
+
+  useEffect(() => {
+    const a = parseFloat(amount.replace(',', '.'));
+    const p = parseFloat(price.replace(',', '.'));
+    const t = parseFloat(total.replace(',', '.'));
+
+    if (!Number.isNaN(a) && !Number.isNaN(p) && (document.activeElement as HTMLElement)?.id !== 'total') {
       setTotal((a * p).toFixed(2));
-    } else if (!isNaN(t) && !isNaN(p) && document.activeElement?.id === 'total') {
-      setAmount((t / p).toString());
-    } else if (!isNaN(t) && !isNaN(a) && document.activeElement?.id === 'total') {
-      setPrice((t / a).toString());
+    }
+    else if (!Number.isNaN(t) && !Number.isNaN(p) && (document.activeElement as HTMLElement)?.id === 'total') {
+      setAmount(p > 0 ? String(t / p) : amount);
     }
   }, [amount, price, total]);
 
+  const parsedAmount = useMemo(() => parseFloat(amount.replace(',', '.')) || 0, [amount]);
+  const parsedPrice  = useMemo(() => parseFloat(price.replace(',', '.'))  || 0, [price]);
+  const parsedTotal  = useMemo(() => parseFloat(total.replace(',', '.'))  || 0, [total]);
+
+  const sellTooMuch = type === 'sell' && parsedAmount > holdingQty + 1e-12;
+  const canSubmit =
+    !submitting &&
+    parsedAmount > 0 &&
+    parsedPrice > 0 &&
+    parsedTotal > 0 &&
+    !(type === 'sell' && sellTooMuch);
+
+  const fillMax = () => setAmount(holdingQty.toString());
+
   const handleSubmit = async () => {
-    const parsedAmount = parseFloat(amount);
-    const parsedPrice = parseFloat(price);
-    const parsedTotal = parseFloat(total);
-
-    if (!parsedAmount || parsedAmount <= 0 || !parsedPrice || !parsedTotal) return;
-
-    const tx = {
-      type,
-      amount: parsedAmount,
-      price: parsedPrice,
-      total: parsedTotal,
-      timestamp: new Date(date).toISOString(),
-      coinId: coin.id,
-      symbol: coin.symbol,
-    };
-
+    if (!canSubmit) return;
+    setSubmitting(true);
     try {
+      const tx = {
+        type,
+        amount: parsedAmount,
+        price: parsedPrice,
+        total: parsedTotal,
+        timestamp: new Date(date).toISOString(),
+        symbol: coin.id,        
+        coinId: coin.id,       
+      };
+
       const res = await fetch('/api/portfolio/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(tx),
       });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed to add transaction');
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to add transaction');
-      }
-
-      await refetch(); // refetch summary
-      onSubmit(data);  // callback to parent
-      onClose();       // close modal
-    } catch (err) {
-      console.error('Error adding transaction:', err);
+      await refetch();
+      onSubmit(json);
+      onClose();
+    } catch (e) {
+      console.error('Error adding transaction:', e);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -97,7 +137,7 @@ export default function AddTransactionModal({ coin, onClose, onSubmit }: Props) 
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center gap-2 text-xl font-semibold">
               <Image src={coin.image} alt={coin.name} width={28} height={28} />
-              <span>{coin.symbol.toUpperCase()} {coin.name}</span>
+              <span>{coin.symbol.toUpperCase()} <span className="text-zinc-400">({coin.name})</span></span>
             </div>
             <button onClick={onClose}>
               <X className="w-5 h-5 text-zinc-400 hover:text-white" />
@@ -105,27 +145,42 @@ export default function AddTransactionModal({ coin, onClose, onSubmit }: Props) 
           </div>
 
           <div className="flex justify-between mb-4 border border-zinc-700 rounded-lg overflow-hidden text-sm font-medium">
-            {['buy', 'sell', 'transfer'].map((t) => (
+            {(['buy', 'sell', 'transfer'] as const).map((t) => (
               <button
                 key={t}
-                onClick={() => setType(t as any)}
-                className={`flex-1 py-2 ${type === t ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-400'}`}
+                onClick={() => setType(t)}
+                className={`flex-1 py-2 ${type === t ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-300'}`}
               >
-                {t.charAt(0).toUpperCase() + t.slice(1)}
+                {t[0].toUpperCase() + t.slice(1)}
               </button>
             ))}
           </div>
 
-          <label className="block text-sm mb-1">Amount</label>
+          <div className="flex items-center justify-between">
+            <label className="block text-sm mb-1">Amount</label>
+            {type === 'sell' && (
+              <div className="text-xs text-zinc-400">
+                Max: {holdingQty.toFixed(8)}{' '}
+                <button onClick={fillMax} className="text-blue-400 hover:underline ml-1">MAX</button>
+              </div>
+            )}
+          </div>
           <input
             type="number"
             id="amount"
-            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded mb-3"
+            className={`w-full px-3 py-2 bg-zinc-800 border ${sellTooMuch ? 'border-red-500' : 'border-zinc-700'} rounded mb-1`}
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            min="0"
+            step="any"
           />
+          {sellTooMuch && (
+            <p className="text-xs text-red-400 mb-2">
+              Too much. You have {holdingQty.toFixed(8)} {coin.symbol.toUpperCase()}.
+            </p>
+          )}
 
-          <label className="block text-sm mb-1">Price</label>
+          <label className="block text-sm mb-1 mt-2">Price</label>
           <div className="flex mb-2">
             <input
               type="number"
@@ -133,15 +188,14 @@ export default function AddTransactionModal({ coin, onClose, onSubmit }: Props) 
               value={price}
               onChange={(e) => setPrice(e.target.value)}
               disabled={priceMode === 'market'}
+              min="0"
+              step="any"
             />
             <div className="bg-zinc-700 px-3 py-2 rounded-r text-sm">USD</div>
           </div>
           <div className="flex gap-2 mb-3 text-xs">
             <button
-              onClick={() => {
-                setPriceMode('market');
-                setPrice(coin.currentPrice.toString());
-              }}
+              onClick={() => { setPriceMode('market'); setPrice(String(coin.currentPrice)); }}
               className={`px-3 py-1 rounded-full ${priceMode === 'market' ? 'bg-blue-600 text-white' : 'bg-zinc-700 text-zinc-300'}`}
             >
               Market Price
@@ -170,15 +224,18 @@ export default function AddTransactionModal({ coin, onClose, onSubmit }: Props) 
               className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-l"
               value={total}
               onChange={(e) => setTotal(e.target.value)}
+              min="0"
+              step="any"
             />
             <div className="bg-zinc-700 px-3 py-2 rounded-r text-sm">USD</div>
           </div>
 
           <button
+            disabled={!canSubmit}
             onClick={handleSubmit}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold transition"
+            className="w-full bg-blue-600 disabled:bg-blue-600/60 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold transition"
           >
-            Add Transaction
+            {submitting ? 'Saving…' : 'Add Transaction'}
           </button>
         </motion.div>
       </motion.div>

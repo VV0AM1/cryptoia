@@ -9,7 +9,6 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(_: NextRequest) {
   try {
-    // Read the current stats
     const raw = await fs.readFile(DATA_PATH, 'utf-8');
     const cached = JSON.parse(raw);
 
@@ -17,7 +16,6 @@ export async function GET(_: NextRequest) {
     const lastUpdated = new Date(cached.lastUpdated);
     const diffHours = (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60);
 
-    // If it's been less than 24 hours, return cached
     if (diffHours < 24) {
       return NextResponse.json({
         totalMarketCap: cached.totalMarketCap,
@@ -27,7 +25,6 @@ export async function GET(_: NextRequest) {
       });
     }
 
-    // Else: fetch new data
     const { data: binanceData } = await axios.get('https://api.binance.com/api/v3/ticker/24hr');
     const usdtPairs = binanceData.filter((pair: any) => pair.symbol.endsWith('USDT'));
 
@@ -47,7 +44,6 @@ export async function GET(_: NextRequest) {
     const { data: geckoData } = await axios.get('https://api.coingecko.com/api/v3/global');
     const totalMarketCap = geckoData.data.total_market_cap.usd;
 
-    // Save to local file
     const newStats = {
       totalMarketCap,
       totalVolume,

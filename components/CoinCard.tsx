@@ -1,14 +1,16 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { LineChart, Line, YAxis, ResponsiveContainer } from 'recharts';
-import { Coin } from './CoinSection';
 import { Star } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Coin } from './CoinSection';
+import type { ICoin } from '@/models/Coin'; 
+
 
 type Props = {
   coin: Coin;
-  onUpdate?: () => void; // Optional callback to trigger revalidation in parent
+  onUpdate?: () => void;
 };
 
 export default function CoinCard({ coin, onUpdate }: Props) {
@@ -16,34 +18,38 @@ export default function CoinCard({ coin, onUpdate }: Props) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-  const checkWatchlist = async () => {
-    try {
-      const res = await fetch('/api/watchlist');
-      const list = await res.json();
-      const isFavorited = list.some((c: Coin) => c.symbol === coin.symbol);
-      setFavorited(isFavorited);
-    } catch (e) {
-      console.error('Failed to fetch watchlist', e);
-    }
-  };
+    let ignore = false;
+    const checkWatchlist = async () => {
+      try {
+        const res = await fetch('/api/watchlist');
+        const list = await res.json();
+        if (!ignore) {
+          const isFavorited = Array.isArray(list) && list.some((c: Coin) => c.symbol === coin.symbol);
+          setFavorited(isFavorited);
+        }
+      } catch (e) {
+        console.error('Failed to fetch watchlist', e);
+      }
+    };
+    checkWatchlist();
+    return () => { ignore = true; };
+  }, [coin.symbol]);
 
-  checkWatchlist();
-}, [coin.symbol]);
+  const history = useMemo(
+    () =>
+      coin.sparkline_in_7d?.price?.map((p, i) => ({ time: i, priceUsd: p })) ??
+      [{ time: 0, priceUsd: coin.current_price }],
+    [coin.sparkline_in_7d?.price, coin.current_price]
+  );
 
+  const change24h = coin.price_change_percentage_24h ?? 0;
+  const change7d = coin.price_change_percentage_7d_in_currency ?? 0;
 
-  const history = coin.sparkline_in_7d?.price?.map((price, i) => ({
-    time: i,
-    priceUsd: price,
-  })) || [];
+  const changeColor24h = change24h >= 0 ? 'text-green-400' : 'text-red-400';
+  const changeColor7d = change7d >= 0 ? 'text-green-400' : 'text-red-400';
 
-  const change24h = coin.price_change_percentage_24h.toFixed(2);
-  const change7d = coin.price_change_percentage_7d_in_currency?.toFixed(2) ?? '0.00';
-
-  const changeColor24h = parseFloat(change24h) >= 0 ? 'text-green-400' : 'text-red-400';
-  const changeColor7d = parseFloat(change7d) >= 0 ? 'text-green-400' : 'text-red-400';
-
-  const marketCap = (coin.market_cap / 1e9).toFixed(2) + ' B';
-  const volume = (coin.total_volume / 1e9).toFixed(2) + ' B';
+  const marketCap = `${(coin.market_cap / 1e9).toFixed(2)} B`;
+  const volume = `${(coin.total_volume / 1e9).toFixed(2)} B`;
 
   const handleFavoriteToggle = async () => {
     if (loading) return;
@@ -52,16 +58,29 @@ export default function CoinCard({ coin, onUpdate }: Props) {
     try {
       const method = favorited ? 'DELETE' : 'POST';
 
+      // ✅ Fully typed ICoin object
+      const coinData: ICoin = {
+        coinId: coin.id,
+        symbol: coin.symbol,
+        name: coin.name,
+        image: coin.image,
+        currentPrice: coin.current_price,
+        priceChangePercentage24h: coin.price_change_percentage_24h,
+        totalInvested: 0,
+        averagePrice: 0,
+        quantity: 0
+      };
+
       const res = await fetch('/api/watchlist', {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ coin }),
+        body: JSON.stringify({ coin: coinData }),
       });
 
       if (!res.ok) throw new Error('Failed to update watchlist');
 
       setFavorited(!favorited);
-      onUpdate?.(); // Trigger refetch or parent update
+      onUpdate?.();
     } catch (err) {
       console.error('Watchlist toggle error:', err);
     } finally {
@@ -70,16 +89,16 @@ export default function CoinCard({ coin, onUpdate }: Props) {
   };
 
   return (
-    <div className="grid grid-cols-9 gap-4 items-center text-white text-sm py-4 border-b border-zinc-700">
-      <p className="text-zinc-400">{coin.market_cap_rank}</p>
-
+    <div className="grid grid-cols-5 sm:grid-cols-9 gap-4 items-center text-white text-sm py-4 border-b border-zinc-700">
+      {/* ⭐ */}
       <motion.button
         onClick={handleFavoriteToggle}
-        whileTap={{ scale: 1.3, rotate: 20 }}
-        animate={{ scale: favorited ? 1.1 : 1, rotate: 0 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-        className="text-zinc-400 hover:text-yellow-400 transition-colors disabled:opacity-50"
+        whileTap={{ scale: 1.25, rotate: 10 }}
+        animate={{ scale: favorited ? 1.05 : 1 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 16 }}
+        className="text-zinc-400 hidden sm:block hover:text-yellow-400 transition-colors disabled:opacity-50"
         disabled={loading}
+        aria-label={favorited ? 'Remove from watchlist' : 'Add to watchlist'}
       >
         <Star
           className="w-5 h-5"
@@ -88,6 +107,7 @@ export default function CoinCard({ coin, onUpdate }: Props) {
         />
       </motion.button>
 
+      {/* Asset */}
       <div className="flex items-center gap-2">
         <img src={coin.image} className="w-5 h-5 sm:w-6 sm:h-6" alt={coin.symbol} />
         <div>
@@ -96,20 +116,30 @@ export default function CoinCard({ coin, onUpdate }: Props) {
         </div>
       </div>
 
+      {/* Price (visible on mobile + desktop) */}
       <p className="text-right">${coin.current_price.toFixed(2)}</p>
-      <p className={`text-right ${changeColor24h}`}>{change24h}%</p>
-      <p className={`text-right ${changeColor7d}`}>{change7d}%</p>
-      <p className="text-right">{marketCap}</p>
-      <p className="text-right">{volume}</p>
 
-      <div className="h-8 w-full">
+      {/* 24h % */}
+      <p className={`text-right ${changeColor24h}`}>{change24h.toFixed(2)}%</p>
+
+      {/* 7d % */}
+      <p className={`text-right ${changeColor7d}`}>{change7d.toFixed(2)}%</p>
+
+      {/* Market Cap */}
+      <p className="text-right">{marketCap}</p>
+
+      {/* 24h Volume (desktop only) */}
+      <p className="text-right hidden sm:block">{volume}</p>
+
+      {/* 7d Chart (desktop only) */}
+      <div className="h-8 ml-8 w-full hidden sm:block">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={history.length > 0 ? history : [{ time: 0, priceUsd: coin.current_price }]}>
+          <LineChart data={history}>
             <YAxis domain={['dataMin', 'dataMax']} hide />
             <Line
               type="monotone"
               dataKey="priceUsd"
-              stroke={parseFloat(change24h) >= 0 ? '#4ade80' : '#f87171'}
+              stroke={change24h >= 0 ? '#4ade80' : '#f87171'}
               strokeWidth={2}
               dot={false}
             />

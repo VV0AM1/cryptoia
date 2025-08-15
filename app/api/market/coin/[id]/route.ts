@@ -10,17 +10,14 @@ const symbolMap = rawSymbolMap as Record<string, Meta>;
 
 export async function GET(req: Request) {
   try {
-    // read [id] from URL to avoid Netlify typing issues
     const { pathname } = new URL(req.url);
-    const rawId = (pathname.split('/').pop() || '').toUpperCase(); // e.g. BTCUSDT
+    const rawId = (pathname.split('/').pop() || '').toUpperCase(); 
     if (!rawId || !/^[A-Z0-9]+$/.test(rawId)) {
       return NextResponse.json({ error: 'Invalid symbol' }, { status: 400 });
     }
 
-    // use the pair key (BTCUSDT) for metadata
     const meta = symbolMap[rawId];
 
-    // derive base symbol only for the "symbol" field
     const QUOTES = ['USDT', 'USDC', 'BUSD', 'FDUSD', 'TUSD', 'USD'];
     const quote = QUOTES.find(q => rawId.endsWith(q));
     const baseSymbol = quote ? rawId.slice(0, -quote.length) : rawId;
@@ -29,7 +26,6 @@ export async function GET(req: Request) {
     let image = meta?.image ?? '/default-coin.png';
     const cgId = meta?.id || '';
 
-    // price from Binance (primary)
     let currentPrice = 0;
     try {
       const r = await fetch(
@@ -45,7 +41,6 @@ export async function GET(req: Request) {
       console.error('[coin:id] Binance fetch failed:', e);
     }
 
-    // fallback price from CoinGecko if Binance lacks the pair
     if (!currentPrice && cgId) {
       try {
         const headers: Record<string, string> = { 'User-Agent': 'YourApp/1.0' };
@@ -66,10 +61,10 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({
-      id: rawId,                 // BTCUSDT (pair)
-      symbol: baseSymbol,        // BTC (base)
-      name,                      // from your JSON
-      image,                     // from your JSON
+      id: rawId,               
+      symbol: baseSymbol,     
+      name,                      
+      image,                  
       currentPrice: Number(currentPrice) || 0,
     });
   } catch (err: any) {
