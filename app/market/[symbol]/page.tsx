@@ -5,7 +5,7 @@ import rawSymbolMap from "@/data/symbolMap.json";
 type SymbolMeta = { name: string; image: string; id?: string };
 const symbolMap = rawSymbolMap as Record<string, SymbolMeta>;
 
-export const revalidate = 0; 
+export const revalidate = 0; // SSR
 
 async function fetchBinance(symbol: string) {
   const base = "https://api.binance.com/api/v3";
@@ -33,8 +33,18 @@ async function fetchBinance(symbol: string) {
   };
 }
 
-export default async function Page({ params }: { params: { symbol: string } }) {
-  const symbol = params.symbol.toUpperCase();
+// Accept either a plain params object (Next default) or a Promise (Netlify typing)
+type Params = { symbol: string };
+type MaybePromise<T> = T | Promise<T>;
+
+export default async function Page({
+  params,
+}: {
+  params: MaybePromise<Params>;
+}) {
+  const p = await Promise.resolve(params); // normalize
+  const symbol = (p.symbol || "").toUpperCase();
+
   const meta = symbolMap[symbol];
   if (!meta) notFound();
 
@@ -42,7 +52,7 @@ export default async function Page({ params }: { params: { symbol: string } }) {
 
   return (
     <div className="w-full bg-zinc-900">
-        <MarketCoinPage
+      <MarketCoinPage
         initial={{
           symbol,
           name: meta.name,
