@@ -19,7 +19,6 @@ function baseFromPair(pair: string) {
   return quote ? up.slice(0, -quote.length) : up;
 }
 
-// Small helper to limit concurrent kline calls
 async function pMap<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
   const ret: R[] = [];
   let i = 0;

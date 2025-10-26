@@ -11,7 +11,6 @@ import AddAssetModal from '@/components/AddAssetModal';
 import AddTransactionModal from '@/components/AddTransactionModal';
 import ConverterModal from '@/components/ConverterModal';
 
-// Icons
 import {
   Bars3Icon,
   XMarkIcon,
@@ -26,7 +25,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 type MarketCoin = {
-  id: string; // e.g. BTCUSDT
+  id: string; 
   symbol: string;
   name: string;
   image: string;
@@ -184,7 +183,6 @@ export default function NavBar() {
           </button>
         </div>
 
-        {/* Right actions (desktop) */}
         <div className="hidden md:flex items-center space-x-3">
           {session?.user ? (
             <>
@@ -394,18 +392,125 @@ export default function NavBar() {
                 </button>
               </div>
 
-              <div className="px-4 py-3 grid grid-cols-2 gap-2">
-                <Link
-                  href="/watchlist"
-                  onClick={() => setMenuOpen(false)}
-                  className="bg-zinc-800 text-white rounded-lg px-3 py-2 text-center"
-                >
-                  ⭐ Watchlist
-                </Link>
-                <button onClick={() => setShowAddAsset(true)} className="bg-zinc-800 text-white rounded-lg px-3 py-2">
-                  ➕ Add Asset
-                </button>
-              </div>
+              <div className="px-4 py-3 space-y-4">
+              {session?.user ? (
+                <>
+                  <div className="bg-zinc-800 border border-zinc-700 rounded-2xl p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-cyan-500 rounded-full flex items-center justify-center font-semibold text-white">
+                          {userInitial}
+                        </div>
+                        <span className="text-white font-medium text-sm">Main</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setShowAddAsset(true);
+                          setMenuOpen(false);
+                        }}
+                        className="text-zinc-400 hover:text-white"
+                        title="Add Asset"
+                      >
+                        <PlusCircleIcon className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    <div className="mt-2 text-2xl font-semibold text-white">
+                      {loading ? 'Loading…' : formattedValue}
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className={`${profitColor} px-2 py-0.5 rounded text-sm font-medium`}>
+                        {isProfit ? '+' : '-'}
+                        {percent}%
+                      </span>
+                      <span className={`${isProfit ? 'text-green-400' : 'text-red-400'} text-sm font-medium`}>
+                        ${profit}
+                      </span>
+                      <span className="text-zinc-400 text-xs">24h</span>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => {
+                          setShowAddAsset(true);
+                          setMenuOpen(false);
+                        }}
+                        className="bg-zinc-700 hover:bg-zinc-600 text-white py-2 rounded-lg text-sm transition"
+                      >
+                        ➕ Add Asset
+                      </button>
+                      <Link
+                        href="/portfolio"
+                        onClick={() => setMenuOpen(false)}
+                        className="bg-zinc-700 hover:bg-zinc-600 text-white py-2 rounded-lg text-sm text-center transition"
+                      >
+                        📂 Open Portfolio
+                      </Link>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2">
+                    <Link
+                      href="/watchlist"
+                      onClick={() => setMenuOpen(false)}
+                      className="bg-zinc-800 text-white rounded-lg px-3 py-2 text-center"
+                    >
+                      ⭐ Watchlist
+                    </Link>
+                  </div>
+
+                  <div className="bg-zinc-800 border border-zinc-700 rounded-2xl p-4">
+                    <div className="mb-3 text-sm text-white">
+                      <div className="font-semibold">{session.user.name}</div>
+                      <div className="text-zinc-400 text-xs">{session.user.email}</div>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      <Link
+                        href="/profile"
+                        onClick={() => setMenuOpen(false)}
+                        className="block px-3 py-2 hover:bg-zinc-700 rounded"
+                      >
+                        Account / Profile
+                      </Link>
+                      <Link
+                        href="/notifications"
+                        onClick={() => setMenuOpen(false)}
+                        className="block px-3 py-2 hover:bg-zinc-700 rounded"
+                      >
+                        Notifications
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setMenuOpen(false);
+                          signOut();
+                        }}
+                        className="w-full text-left text-red-400 hover:text-white px-3 py-2 hover:bg-red-600 rounded transition"
+                      >
+                        Log out
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <Link
+                    href="/login"
+                    onClick={() => setMenuOpen(false)}
+                    className="text-sm px-4 py-2 border border-zinc-600 rounded-md hover:bg-zinc-700 transition text-white text-center"
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    href="/register"
+                    onClick={() => setMenuOpen(false)}
+                    className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition text-center"
+                  >
+                    Register
+                  </Link>
+                </div>
+              )}
+            </div>
             </motion.aside>
           </>
         )}
