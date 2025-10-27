@@ -5,7 +5,7 @@ import rawSymbolMap from "@/data/symbolMap.json";
 type SymbolMeta = { name: string; image: string; id?: string };
 const symbolMap = rawSymbolMap as Record<string, SymbolMeta>;
 
-export const revalidate = 0; // SSR
+export const revalidate = 0; 
 
 async function fetchBinance(symbol: string) {
   const base = "https://api.binance.com/api/v3";
@@ -33,9 +33,8 @@ async function fetchBinance(symbol: string) {
   };
 }
 
-// NOTE: use `any` to satisfy Netlify's PageProps constraint (params may be a Promise)
 export default async function Page(props: any) {
-  const params = await props?.params; // works for Promise or plain object
+  const params = await props?.params; 
   const symbol = String(params?.symbol ?? "").toUpperCase();
 
   const meta = symbolMap[symbol];

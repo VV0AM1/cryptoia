@@ -58,7 +58,6 @@ export default function CoinCard({ coin, onUpdate }: Props) {
     try {
       const method = favorited ? 'DELETE' : 'POST';
 
-      // ✅ Fully typed ICoin object
       const coinData: ICoin = {
         coinId: coin.id,
         symbol: coin.symbol,
@@ -90,7 +89,6 @@ export default function CoinCard({ coin, onUpdate }: Props) {
 
   return (
     <div className="grid grid-cols-5 sm:grid-cols-9 gap-4 items-center text-white text-sm py-4 border-b border-zinc-700">
-      {/* ⭐ */}
       <motion.button
         onClick={handleFavoriteToggle}
         whileTap={{ scale: 1.25, rotate: 10 }}
@@ -107,7 +105,6 @@ export default function CoinCard({ coin, onUpdate }: Props) {
         />
       </motion.button>
 
-      {/* Asset */}
       <div className="flex items-center gap-2">
         <img src={coin.image} className="w-5 h-5 sm:w-6 sm:h-6" alt={coin.symbol} />
         <div>
@@ -116,22 +113,16 @@ export default function CoinCard({ coin, onUpdate }: Props) {
         </div>
       </div>
 
-      {/* Price (visible on mobile + desktop) */}
       <p className="text-right">${coin.current_price.toFixed(2)}</p>
 
-      {/* 24h % */}
       <p className={`text-right ${changeColor24h}`}>{change24h.toFixed(2)}%</p>
 
-      {/* 7d % */}
       <p className={`text-right ${changeColor7d}`}>{change7d.toFixed(2)}%</p>
 
-      {/* Market Cap */}
       <p className="text-right">{marketCap}</p>
 
-      {/* 24h Volume (desktop only) */}
       <p className="text-right hidden sm:block">{volume}</p>
 
-      {/* 7d Chart (desktop only) */}
       <div className="h-8 ml-8 w-full hidden sm:block">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={history}>
