@@ -3,6 +3,8 @@
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
+export const dynamic = 'force-dynamic';
+
 export default function VerifiedPage() {
   const params = useSearchParams();
   const router = useRouter();
@@ -23,7 +25,6 @@ export default function VerifiedPage() {
           {email ? `Your account (${email}) has been successfully verified.` : 'Your account has been verified.'}
         </p>
         <p className="text-gray-400 text-sm">Redirecting to home page in 5 seconds...</p>
-
         <div className="mt-4 animate-bounce text-green-400 text-xl">✓</div>
       </div>
     </div>
