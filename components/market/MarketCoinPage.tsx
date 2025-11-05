@@ -18,7 +18,7 @@ export default function MarketCoinPage({ initial }: { initial: Initial }) {
   const contentWidth = "w-full lg:w-[calc(100%-300px)]";
 
   return (
-    <div className={` ${marginLeft} ${contentWidth} bg-zinc-900 h-screen text-white px-4 sm:px-6 md:px-8 py-6`}>
+    <div className={` ${marginLeft} ${contentWidth} bg-zinc-900 min-h-dvh text-white px-4 sm:px-6 md:px-8 py-6`}>
       <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
         <div className="flex items-center gap-3">
           <img src={initial.image} alt={initial.name} className="w-8 h-8 rounded-full" />

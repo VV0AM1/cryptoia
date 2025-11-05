@@ -5,6 +5,7 @@ import { ITransaction, TransactionSchema } from './Transaction';
 import { INote, NoteSchema } from './Note';
 
 export interface IUser extends Document {
+  _id: mongoose.Types.ObjectId;
   name: string;
   email: string;
   password?: string;
@@ -13,7 +14,12 @@ export interface IUser extends Document {
   totalInvested: number;
   totalCurrentValue: number;
   totalProfit: number;
-  watchlist: ICoin[];                     // <-- ICoin[]
+  provider?: string; 
+  isVerified: boolean; 
+  role: 'user' | 'admin';
+  createdAt: Date;
+  updatedAt: Date;
+  watchlist: ICoin[];                   
   transactions: Types.DocumentArray<ITransaction>;
   notes: Types.DocumentArray<INote>;
 }
@@ -25,7 +31,7 @@ const UserSchema = new Schema<IUser>({
   avatar: { type: String },
 
   coins: [CoinSchema],
-  watchlist: { type: [CoinSchema], default: [] },  // <-- full ICoin schema
+  watchlist: { type: [CoinSchema], default: [] }, 
 
   transactions: [TransactionSchema],
   notes: [NoteSchema],
@@ -33,7 +39,10 @@ const UserSchema = new Schema<IUser>({
   totalInvested: { type: Number, default: 0 },
   totalCurrentValue: { type: Number, default: 0 },
   totalProfit: { type: Number, default: 0 },
-});
+    provider: { type: String, default: 'credentials' },
+  isVerified: { type: Boolean, default: false },
+  role: { type: String, enum: ['user','admin'], default: 'user' },
+}, { timestamps: true });
 
 export const User: Model<IUser> =
   mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
