@@ -13,49 +13,31 @@ interface DecodedOtp extends jwt.JwtPayload {
 }
 
 export const authOptions: NextAuthOptions = {
-  session: { strategy: "jwt" },   
-  trustHost: true,                 
+  session: { strategy: "jwt" },
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: { params: { prompt: "select_account" } },
     }),
-
     CredentialsProvider({
       name: "OTP Login",
       credentials: {
         email: { label: "Email", type: "email" },
         otpToken: { label: "OTP Token", type: "text" },
       },
-
       async authorize(credentials) {
         const email = credentials?.email;
         const otpToken = credentials?.otpToken;
-
-        if (!email || !otpToken) {
-          console.error("Missing email or otpToken");
-          return null;
-        }
+        if (!email || !otpToken) return null;
 
         try {
-          const decoded = jwt.verify(
-            otpToken,
-            process.env.JWT_SECRET!
-          ) as DecodedOtp;
-
-          if (!decoded || decoded.email !== email) {
-            console.error("Token invalid or email mismatch:", decoded);
-            return null;
-          }
+          const decoded = jwt.verify(otpToken, process.env.JWT_SECRET!) as DecodedOtp;
+          if (!decoded || decoded.email !== email) return null;
 
           await connectToDatabase();
-
           const user = await UserModel.findOne({ email });
-          if (!user) {
-            console.error("No user found for email:", email);
-            return null;
-          }
+          if (!user) return null;
 
           return {
             id: user._id.toString(),
@@ -63,14 +45,12 @@ export const authOptions: NextAuthOptions = {
             name: user.name,
             role: user.role || "user",
           };
-        } catch (err) {
-          console.error("OTP token verification failed:", err);
+        } catch {
           return null;
         }
       },
     }),
   ],
-
   callbacks: {
     async signIn({ user, account }) {
       await connectToDatabase();
@@ -79,7 +59,6 @@ export const authOptions: NextAuthOptions = {
         if (!user.email) return false;
 
         const existing = await UserModel.findOne({ email: user.email });
-
         if (!existing) {
           const isAdmin = user.email.toLowerCase() === "serleb2000@gmail.com";
           await UserModel.create({
@@ -125,12 +104,8 @@ export const authOptions: NextAuthOptions = {
       return baseUrl;
     },
   },
-
   secret: process.env.NEXTAUTH_SECRET,
-
-  pages: {
-    signIn: "/login",
-  },
+  pages: { signIn: "/login" },
 };
 
 export default NextAuth(authOptions);
