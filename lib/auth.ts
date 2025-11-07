@@ -13,14 +13,15 @@ interface DecodedOtp extends jwt.JwtPayload {
 }
 
 export const authOptions: NextAuthOptions = {
+  session: { strategy: "jwt" },   
+  trustHost: true,                 
   providers: [
-    // ✅ Google OAuth Provider
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: { params: { prompt: "select_account" } },
     }),
 
-    // ✅ Custom OTP Provider
     CredentialsProvider({
       name: "OTP Login",
       credentials: {
@@ -38,7 +39,6 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          // 🧩 Decode and verify the token that was generated in /api/verify-otp
           const decoded = jwt.verify(
             otpToken,
             process.env.JWT_SECRET!
@@ -57,7 +57,6 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
-          // ✅ Return user info that NextAuth will serialize into the session
           return {
             id: user._id.toString(),
             email: user.email,
@@ -72,17 +71,17 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
 
-  // ✅ Handle Google + Credentials sessions
   callbacks: {
     async signIn({ user, account }) {
       await connectToDatabase();
 
-      // Google sign-in logic
       if (account?.provider === "google") {
+        if (!user.email) return false;
+
         const existing = await UserModel.findOne({ email: user.email });
 
         if (!existing) {
-          const isAdmin = user.email?.toLowerCase() === "serleb2000@gmail.com";
+          const isAdmin = user.email.toLowerCase() === "serleb2000@gmail.com";
           await UserModel.create({
             name: user.name || "Google User",
             email: user.email,
@@ -96,15 +95,13 @@ export const authOptions: NextAuthOptions = {
           await existing.save();
         }
       }
-
       return true;
     },
 
     async jwt({ token, user }) {
-      // 🧩 Merge user data into token
       if (user) {
-        token.role = user.role;
-        token.sub = user.id;
+        token.role = (user as any).role;
+        token.sub = (user as any).id;
         token.email = user.email;
       }
       return token;
@@ -118,12 +115,21 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
+
+    async redirect({ url, baseUrl }) {
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      try {
+        const u = new URL(url);
+        if (u.origin === baseUrl) return url;
+      } catch {}
+      return baseUrl;
+    },
   },
 
   secret: process.env.NEXTAUTH_SECRET,
 
   pages: {
-    signIn: "/auth/signin",
+    signIn: "/login",
   },
 };
 

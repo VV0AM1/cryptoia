@@ -22,7 +22,7 @@ const transporter = nodemailer.createTransport({
 });
 
 export async function sendVerificationEmail(email: string, name: string, token: string) {
-  const verifyUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL}/api/auth/verify?token=${token}`;
+    const verifyUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL}/api/auth/verify?token=${token}`;
 
   const html = verificationHtmlTemplate({ name, verifyUrl });
 

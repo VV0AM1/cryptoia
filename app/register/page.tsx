@@ -80,7 +80,7 @@ export default function RegisterPage() {
         <div className="flex items-center justify-center mt-4">
           <button
             type="button"
-            onClick={() => signIn('google')}
+            onClick={() => signIn("google", { callbackUrl: "/" })}
             className="flex items-center justify-center w-full gap-2 border border-gray-600 py-2 rounded hover:bg-zinc-700"
           >
             <FcGoogle className="text-xl" />

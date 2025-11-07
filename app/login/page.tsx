@@ -38,46 +38,34 @@ export default function LoginPage() {
 
   const handleOtpVerify = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
 
-
-    console.log("Sending OTP verify request:", {
-      email: form.email,
-      code: otp,
-      tempToken,
-    });
-
-    const res = await fetch('/api/verify-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await fetch("/api/verify-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: form.email, code: otp, tempToken }),
-      credentials: 'include',
-      });
+      credentials: "include",
+    });
 
     const data = await res.json();
 
-    if (res.ok && data.otpToken) {
-      await signIn("credentials", {
-        email: form.email,
-        otpToken: data.otpToken,
-        redirect: true,
-        callbackUrl: "/",
-      });
-    } else {
-      console.error("Failed to log in after verification", data);
+    if (!res.ok || !data.otpToken) {
+      setError(data?.message || "Invalid code");
+      return;
     }
 
     const loginResult = await signIn("credentials", {
       redirect: false,
       email: form.email,
-      otpToken: data.token, 
+      otpToken: data.otpToken, 
     });
 
     if (loginResult?.error) {
-      setError("Failed to log in after verification");
+      setError(loginResult.error || "Failed to log in after verification");
       return;
     }
 
-    router.push("/");
+    router.replace("/");
   };
 
   return (
@@ -112,7 +100,7 @@ export default function LoginPage() {
 
             <button
               type="button"
-              onClick={() => signIn('google')}
+              onClick={() => signIn("google", { callbackUrl: "/" })}
               className="flex items-center justify-center w-full gap-2 border border-gray-600 py-2 rounded hover:bg-zinc-700"
             >
               <FcGoogle className="text-xl" />

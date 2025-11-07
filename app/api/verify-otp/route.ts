@@ -12,59 +12,41 @@ export async function POST(req: Request) {
     await connectToDatabase();
     const { email, code, tempToken } = await req.json();
 
-    console.log("🧩 Incoming verify request:", { email, code, tempToken });
+    if (!email || !code || !tempToken)
+      return NextResponse.json({ message: "Missing fields" }, { status: 400 });
 
     const otpDoc = await Otp.findOne({ email });
-    console.log("📄 Found OTP in DB:", otpDoc);
-
-    if (!email || !code || !tempToken)
-      return NextResponse.json({ message: 'Missing fields' }, { status: 400 });
-
-    if (!otpDoc)
-      return NextResponse.json({ message: 'No OTP requested' }, { status: 400 });
+    if (!otpDoc) return NextResponse.json({ message: "No OTP requested" }, { status: 400 });
 
     if (otpDoc.expiresAt.getTime() < Date.now()) {
       await Otp.deleteOne({ _id: otpDoc._id });
-      return NextResponse.json({ message: 'OTP expired' }, { status: 400 });
+      return NextResponse.json({ message: "OTP expired" }, { status: 400 });
     }
 
     if (otpDoc.tempToken !== tempToken) {
-      console.log("🚨 Temp token mismatch:", {
-        expected: otpDoc.tempToken,
-        received: tempToken,
-      });
-      return NextResponse.json({ message: 'Invalid temp token' }, { status: 400 });
+      return NextResponse.json({ message: "Invalid temp token" }, { status: 400 });
     }
+
     if (otpDoc.code !== code) {
       otpDoc.attempts += 1;
       await otpDoc.save();
       if (otpDoc.attempts >= 5) {
         await Otp.deleteOne({ _id: otpDoc._id });
-        return NextResponse.json({ message: 'Too many attempts' }, { status: 429 });
+        return NextResponse.json({ message: "Too many attempts" }, { status: 429 });
       }
-      return NextResponse.json({ message: 'Invalid code' }, { status: 401 });
+      return NextResponse.json({ message: "Invalid code" }, { status: 401 });
     }
 
     const user = await User.findOne<IUser>({ email });
-    if (!user) return NextResponse.json({ message: 'User not found' }, { status: 404 });
+    if (!user) return NextResponse.json({ message: "User not found" }, { status: 404 });
 
-    const tokenPayload = {
-    sub: user._id.toString(), 
-    email: user.email,
-    name: user.name,
-    role: user.role,
-    };
+    const otpToken = jwt.sign({ email: user.email }, process.env.JWT_SECRET!, { expiresIn: "15m" });
 
-  const otpToken = jwt.sign({ email: user.email }, JWT_SECRET, { expiresIn: '15m' });
+    await Otp.deleteOne({ _id: otpDoc._id });
 
-      await Otp.deleteOne({ _id: otpDoc._id });
-
-      return NextResponse.json({
-        message: 'OTP verified successfully',
-        otpToken,
-      });
-    } catch (err) {
-      console.error("❌ Server error in verify-otp:", err);
-      return NextResponse.json({ message: 'Server error' }, { status: 500 });
-    }
+    return NextResponse.json({ message: "OTP verified successfully", otpToken });
+  } catch (err) {
+    console.error("❌ Server error in verify-otp:", err);
+    return NextResponse.json({ message: "Server error" }, { status: 500 });
+  }
 }
