@@ -1,21 +1,34 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { LineChart, Line, YAxis, ResponsiveContainer } from 'recharts';
 import { Star } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import { Coin } from './CoinSection';
 import type { ICoin } from '@/models/Coin'; 
-
 
 type Props = {
   coin: Coin;
   onUpdate?: () => void;
 };
 
+
+const BINANCE_SYMBOL_OVERRIDES: Record<string, string> = {
+
+};
+
+function toBinancePair(sym: string) {
+  const base = (BINANCE_SYMBOL_OVERRIDES[sym.toUpperCase()] ?? sym.toUpperCase()).replace(/[^A-Z0-9]/g, '');
+  return `${base}USDT`;
+}
+
 export default function CoinCard({ coin, onUpdate }: Props) {
+  const router = useRouter();
   const [favorited, setFavorited] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const pair = useMemo(() => toBinancePair(coin.symbol), [coin.symbol]);
 
   useEffect(() => {
     let ignore = false;
@@ -51,7 +64,8 @@ export default function CoinCard({ coin, onUpdate }: Props) {
   const marketCap = `${(coin.market_cap / 1e9).toFixed(2)} B`;
   const volume = `${(coin.total_volume / 1e9).toFixed(2)} B`;
 
-  const handleFavoriteToggle = async () => {
+  const handleFavoriteToggle = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (loading) return;
     setLoading(true);
 
@@ -85,10 +99,35 @@ export default function CoinCard({ coin, onUpdate }: Props) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [coin, favorited, loading, onUpdate]);
+
+  const goToPair = useCallback(() => {
+    router.push(`/market/${pair}`);
+  }, [router, pair]);
+
+  const onKey = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      goToPair();
+    }
+  }, [goToPair]);
 
   return (
-    <div className="grid grid-cols-5 sm:grid-cols-9 gap-4 items-center text-white text-sm py-4 border-b border-zinc-700">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={goToPair}
+      onKeyDown={onKey}
+      aria-label={`Open ${pair} market`}
+      className="
+        group cursor-pointer rounded-md -mx-2 px-2
+        grid grid-cols-5 sm:grid-cols-9 gap-4 items-center text-white text-sm
+        py-4 border-b border-zinc-700
+        transition-all duration-150 ease-out
+        hover:bg-zinc-800/40 hover:-translate-y-0.5 hover:shadow-md
+        focus:outline-none focus:ring-2 focus:ring-zinc-600/50
+      "
+    >
       <motion.button
         onClick={handleFavoriteToggle}
         whileTap={{ scale: 1.25, rotate: 10 }}
@@ -105,25 +144,23 @@ export default function CoinCard({ coin, onUpdate }: Props) {
         />
       </motion.button>
 
-      <div className="flex items-center gap-2">
-        <img src={coin.image} className="w-5 h-5 sm:w-6 sm:h-6" alt={coin.symbol} />
-        <div>
-          <p className="leading-none">{coin.name}</p>
+      <div className="flex items-center gap-2 min-w-0">
+        <img src={coin.image} className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" alt={coin.symbol} />
+        <div className="min-w-0">
+          <p className="leading-none truncate transition-colors duration-150 group-hover:text-white">
+            {coin.name}
+          </p>
           <p className="text-[10px] text-zinc-400 leading-none">({coin.symbol.toUpperCase()})</p>
         </div>
       </div>
 
-      <p className="text-right">${coin.current_price.toFixed(2)}</p>
-
+      <p className="text-right">{`$${coin.current_price.toFixed(2)}`}</p>
       <p className={`text-right ${changeColor24h}`}>{change24h.toFixed(2)}%</p>
-
       <p className={`text-right ${changeColor7d}`}>{change7d.toFixed(2)}%</p>
-
       <p className="text-right">{marketCap}</p>
-
       <p className="text-right hidden sm:block">{volume}</p>
 
-      <div className="h-8 ml-8 w-full hidden sm:block">
+      <div className="h-8 ml-8 w-full hidden sm:block opacity-90 transition-opacity duration-150 group-hover:opacity-100">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={history}>
             <YAxis domain={['dataMin', 'dataMax']} hide />

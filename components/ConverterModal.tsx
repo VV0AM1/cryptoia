@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   XMarkIcon,
@@ -11,26 +11,26 @@ import {
 } from '@heroicons/react/24/outline';
 
 type CoinRow = {
-  id: string;       
-  symbol: string;    
+  id: string;        
+  symbol: string;     
   name: string;
   image: string;
-  priceUSDT: number; 
-  change24h: number;
+  priceUSDT: number | null; 
+  change24h: number | null;
 };
 
 type FiatRow = {
-  code: string;     
+  code: string;         
   name: string;
-  pair: string | null;
-  rateUSDT: number;  
+  pair: string | null;    
+  rateUSDT: number | null;
 };
 
 type Props = { open: boolean; onClose: () => void };
 
 type AssetRef =
-  | { kind: 'coin'; id: string }
-  | { kind: 'fiat'; code: string };
+  | { kind: 'coin'; id: string }   
+  | { kind: 'fiat'; code: string } 
 
 export default function ConverterModal({ open, onClose }: Props) {
   const [coins, setCoins] = useState<CoinRow[]>([]);
@@ -44,11 +44,18 @@ export default function ConverterModal({ open, onClose }: Props) {
     if (!open) return;
     let live = true;
     (async () => {
-      const r = await fetch('/api/market/converter', { cache: 'no-store' });
-      const j = await r.json();
-      if (!live) return;
-      setCoins(j.coins ?? []);
-      setFiats(j.fiats ?? []);
+      try {
+        const r = await fetch('/api/market/converter', { cache: 'no-store' });
+        const j = await r.json();
+        if (!live) return;
+        setCoins(j.coins ?? []);
+        setFiats(j.fiats ?? []);
+      } catch {
+        if (live) {
+          setCoins([]);
+          setFiats([]);
+        }
+      }
     })();
     return () => { live = false; };
   }, [open]);
@@ -56,7 +63,7 @@ export default function ConverterModal({ open, onClose }: Props) {
   const usdtPerUnit = (a: AssetRef) => {
     if (a.kind === 'coin') return coins.find((c) => c.id === a.id)?.priceUSDT ?? 0;
     const f = fiats.find((x) => x.code === a.code);
-    return f ? (f.pair ? f.rateUSDT : 1) : 0;
+    return f ? (f.pair ? (f.rateUSDT ?? 0) : 1) : 0;
   };
 
   const fromUSDT = usdtPerUnit(from);
@@ -154,7 +161,6 @@ export default function ConverterModal({ open, onClose }: Props) {
   );
 }
 
-
 function Row({
   label,
   asset,
@@ -183,23 +189,23 @@ function Row({
       >
         <div className="flex items-center gap-3">
           <img src={meta.image} alt={meta.title} className="w-6 h-6 rounded-full" />
-        </div>
-        <div className="ml-9 -mt-6">
-          <div className="text-white font-medium leading-tight">
-            {meta.symbol} <ChevronDownIcon className="inline w-4 h-4 text-zinc-400 ml-1" />
+          <div className="min-w-0">
+            <div className="text-white font-medium leading-tight truncate">
+              {meta.symbol} <ChevronDownIcon className="inline w-4 h-4 text-zinc-400 ml-1" />
+            </div>
+            <div className="text-[11px] text-zinc-400 truncate">{meta.title}</div>
           </div>
-          <div className="text-[11px] text-zinc-400">{meta.title}</div>
         </div>
       </button>
       <div className="w-40 sm:w-48 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2">
         <input
-          type="number"
-          min="0"
-          step="any"
+          type={readOnly ? 'text' : 'number'}         
+          min={readOnly ? undefined : '0'}
+          step={readOnly ? undefined : 'any'}
           value={amount}
-          onChange={(e) => onAmount(e.target.value)}
+          onChange={(e) => { if (!readOnly) onAmount(e.target.value); }} 
           readOnly={readOnly}
-          className="w-full bg-transparent outline-none text-right text-white text-lg"
+          className="w-full bg-transparent outline-none text-right text-white text-lg tabular-nums"
           aria-label={label}
         />
         <div className="text-[11px] text-zinc-500 text-right">{meta.subnote}</div>
@@ -223,16 +229,21 @@ function Picker({
   const [coins, setCoins] = useState<CoinRow[]>([]);
   const [fiats, setFiats] = useState<FiatRow[]>([]);
 
-  // initial 5+5
   useEffect(() => {
     if (!open) return;
     let live = true;
     (async () => {
-      const r = await fetch('/api/market/converter', { cache: 'no-store' });
-      const j = await r.json();
-      if (!live) return;
-      setCoins(j.coins ?? []);
-      setFiats(j.fiats ?? []);
+      try {
+        const r = await fetch('/api/market/converter', { cache: 'no-store' });
+        const j = await r.json();
+        if (!live) return;
+        setCoins(j.coins ?? []);
+        setFiats(j.fiats ?? []);
+      } catch {
+        if (live) {
+          setCoins([]); setFiats([]);
+        }
+      }
     })();
     return () => { live = false; };
   }, [open]);
@@ -240,15 +251,26 @@ function Picker({
   useEffect(() => {
     if (!open) return;
     const h = setTimeout(async () => {
-      const query = q.trim();
-      const url = query ? `/api/market/converter?q=${encodeURIComponent(query)}&limit=10` : '/api/market/converter';
-      const r = await fetch(url, { cache: 'no-store' });
-      const j = await r.json();
-      setCoins(j.coins ?? []);
-      setFiats(j.fiats ?? []);
+      try {
+        const query = q.trim();
+        const url = query ? `/api/market/converter?q=${encodeURIComponent(query)}&limit=10` : '/api/market/converter';
+        const r = await fetch(url, { cache: 'no-store' });
+        const j = await r.json();
+        setCoins(j.coins ?? []);
+        setFiats(j.fiats ?? []);
+      } catch {
+      }
     }, 300);
     return () => clearTimeout(h);
   }, [open, q]);
+
+  const filteredFiats = useMemo(() => {
+    if (!q) return fiats.slice(0, 5);
+    const Q = q.toUpperCase();
+    return fiats.filter(f => f.code.includes(Q) || f.name.toUpperCase().includes(Q)).slice(0, 5);
+  }, [fiats, q]);
+
+  const filteredCoins = useMemo(() => coins.slice(0, 10), [coins]);
 
   return (
     <AnimatePresence>
@@ -285,7 +307,7 @@ function Picker({
 
             <div className="max-h-[420px] overflow-y-auto">
               <Section>Fiat Currencies</Section>
-              {fiats.slice(0, 5).map((f) => (
+              {filteredFiats.map((f) => (
                 <PickRow
                   key={f.code}
                   image={flag(f.code)}
@@ -298,13 +320,13 @@ function Picker({
               ))}
 
               <Section>Cryptocurrencies</Section>
-              {coins.slice(0, 10).map((c) => (
+              {filteredCoins.map((c) => (
                 <PickRow
                   key={c.id}
                   image={c.image}
                   title={c.name}
                   subtitle={c.symbol.toUpperCase()}
-                  right={`$${fmt(c.priceUSDT)}`}
+                  right={c.priceUSDT != null ? `$${fmt(c.priceUSDT)}` : '—'}
                   active={active.kind === 'coin' && active.id === c.id}
                   onClick={() => onPick({ kind: 'coin', id: c.id })}
                 />
@@ -316,7 +338,6 @@ function Picker({
     </AnimatePresence>
   );
 }
-
 
 function Section({ children }: { children: React.ReactNode }) {
   return (
@@ -348,11 +369,11 @@ function PickRow({
         active ? 'bg-zinc-800/70' : ''
       }`}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 min-w-0">
         <img src={image} alt={title} className="w-6 h-6 rounded-full" />
-        <div className="text-left">
-          <div className="text-sm text-white">{title}</div>
-          <div className="text-[11px] text-zinc-400">{subtitle}</div>
+        <div className="text-left min-w-0">
+          <div className="text-sm text-white truncate">{title}</div>
+          <div className="text-[11px] text-zinc-400 truncate">{subtitle}</div>
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -363,16 +384,15 @@ function PickRow({
   );
 }
 
-
 function getMeta(a: AssetRef, coins: CoinRow[], fiats: FiatRow[]) {
   if (a.kind === 'coin') {
     const c = coins.find((x) => x.id === a.id);
     return c
-      ? { image: c.image, symbol: c.symbol, title: c.name, subnote: `1 ${c.symbol} = $${fmt(c.priceUSDT)}` }
-      : { image: '/default-coin.png', symbol: '—', title: '—', subnote: '' };
+      ? { image: c.image, symbol: c.symbol.toUpperCase(), title: c.name, subnote: `1 ${c.symbol.toUpperCase()} = $${fmt(c.priceUSDT ?? 0)}` }
+      : { image: '/images/crypto_logo.png', symbol: '—', title: '—', subnote: '' };
   }
   const f = fiats.find((x) => x.code === a.code);
-  const rate = f?.pair ? f?.rateUSDT ?? 0 : 1;
+  const rate = f?.pair ? (f?.rateUSDT ?? 0) : 1;
   return {
     image: flag(a.code),
     symbol: a.code,
@@ -382,7 +402,7 @@ function getMeta(a: AssetRef, coins: CoinRow[], fiats: FiatRow[]) {
 }
 
 function short(a: AssetRef, coins: CoinRow[], fiats: FiatRow[]) {
-  return a.kind === 'coin' ? (coins.find((x) => x.id === a.id)?.symbol ?? '—') : a.code;
+  return a.kind === 'coin' ? (coins.find((x) => x.id === a.id)?.symbol?.toUpperCase() ?? '—') : a.code;
 }
 
 function fmt(n: number) {

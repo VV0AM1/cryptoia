@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSidebar } from '@/app/context/SidebarContext';
@@ -25,7 +26,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 type MarketCoin = {
-  id: string; 
+  id: string;
   symbol: string;
   name: string;
   image: string;
@@ -41,7 +42,17 @@ type SelectedCoin = {
   currentPrice: number;
 };
 
+const BINANCE_SYMBOL_OVERRIDES: Record<string, string> = {
+
+};
+
+function toBinancePair(sym: string) {
+  const base = (BINANCE_SYMBOL_OVERRIDES[sym.toUpperCase()] ?? sym.toUpperCase()).replace(/[^A-Z0-9]/g, '');
+  return `${base}USDT`;
+}
+
 export default function NavBar() {
+  const router = useRouter();
   const { isOpened } = useSidebar();
   const { data: session } = useSession();
   const { summary, loading, refetch } = usePortfolioSummary();
@@ -120,7 +131,7 @@ export default function NavBar() {
   }, [searchOpen, query]);
 
   const trending = useMemo(() => assets.slice(0, 5), [assets]);
-  const results = useMemo(() => assets.slice(0, 10), [assets]); 
+  const results = useMemo(() => assets.slice(0, 10), [assets]);
 
   const handleAddClick = () => setShowAddAsset(true);
 
@@ -141,6 +152,13 @@ export default function NavBar() {
     } catch (err) {
       console.error('Failed to fetch price:', err);
     }
+  };
+
+  const handleSearchSelect = (c: MarketCoin) => {
+    const pair = toBinancePair(c.symbol);
+    setSearchOpen(false);
+    setMenuOpen(false);
+    router.push(`/market/${pair}`);
   };
 
   const handleTransactionComplete = () => {
@@ -335,9 +353,9 @@ export default function NavBar() {
         onClose={() => setSearchOpen(false)}
         query={query}
         setQuery={setQuery}
-        coins={results}   
-        trending={trending} 
-        onSelect={(c) => handleCoinSelect(c)}
+        coins={results}
+        trending={trending}
+        onSelect={handleSearchSelect} 
       />
 
       <ConverterModal open={converterOpen} onClose={() => setConverterOpen(false)} />
@@ -393,124 +411,124 @@ export default function NavBar() {
               </div>
 
               <div className="px-4 py-3 space-y-4">
-              {session?.user ? (
-                <>
-                  <div className="bg-zinc-800 border border-zinc-700 rounded-2xl p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-cyan-500 rounded-full flex items-center justify-center font-semibold text-white">
-                          {userInitial}
+                {session?.user ? (
+                  <>
+                    <div className="bg-zinc-800 border border-zinc-700 rounded-2xl p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 bg-cyan-500 rounded-full flex items-center justify-center font-semibold text-white">
+                            {userInitial}
+                          </div>
+                          <span className="text-white font-medium text-sm">Main</span>
                         </div>
-                        <span className="text-white font-medium text-sm">Main</span>
+                        <button
+                          onClick={() => {
+                            setShowAddAsset(true);
+                            setMenuOpen(false);
+                          }}
+                          className="text-zinc-400 hover:text-white"
+                          title="Add Asset"
+                        >
+                          <PlusCircleIcon className="w-5 h-5" />
+                        </button>
                       </div>
-                      <button
-                        onClick={() => {
-                          setShowAddAsset(true);
-                          setMenuOpen(false);
-                        }}
-                        className="text-zinc-400 hover:text-white"
-                        title="Add Asset"
-                      >
-                        <PlusCircleIcon className="w-5 h-5" />
-                      </button>
+
+                      <div className="mt-2 text-2xl font-semibold text-white">
+                        {loading ? 'Loading…' : formattedValue}
+                      </div>
+
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className={`${profitColor} px-2 py-0.5 rounded text-sm font-medium`}>
+                          {isProfit ? '+' : '-'}
+                          {percent}%
+                        </span>
+                        <span className={`${isProfit ? 'text-green-400' : 'text-red-400'} text-sm font-medium`}>
+                          ${profit}
+                        </span>
+                        <span className="text-zinc-400 text-xs">24h</span>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => {
+                            setShowAddAsset(true);
+                            setMenuOpen(false);
+                          }}
+                          className="bg-zinc-700 hover:bg-zinc-600 text-white py-2 rounded-lg text-sm transition"
+                        >
+                          ➕ Add Asset
+                        </button>
+                        <Link
+                          href="/portfolio"
+                          onClick={() => setMenuOpen(false)}
+                          className="bg-zinc-700 hover:bg-zinc-600 text-white py-2 rounded-lg text-sm text-center transition"
+                        >
+                          📂 Open Portfolio
+                        </Link>
+                      </div>
                     </div>
 
-                    <div className="mt-2 text-2xl font-semibold text-white">
-                      {loading ? 'Loading…' : formattedValue}
-                    </div>
-
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className={`${profitColor} px-2 py-0.5 rounded text-sm font-medium`}>
-                        {isProfit ? '+' : '-'}
-                        {percent}%
-                      </span>
-                      <span className={`${isProfit ? 'text-green-400' : 'text-red-400'} text-sm font-medium`}>
-                        ${profit}
-                      </span>
-                      <span className="text-zinc-400 text-xs">24h</span>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => {
-                          setShowAddAsset(true);
-                          setMenuOpen(false);
-                        }}
-                        className="bg-zinc-700 hover:bg-zinc-600 text-white py-2 rounded-lg text-sm transition"
-                      >
-                        ➕ Add Asset
-                      </button>
+                    <div className="grid grid-cols-1 gap-2">
                       <Link
-                        href="/portfolio"
+                        href="/watchlist"
                         onClick={() => setMenuOpen(false)}
-                        className="bg-zinc-700 hover:bg-zinc-600 text-white py-2 rounded-lg text-sm text-center transition"
+                        className="bg-zinc-800 text-white rounded-lg px-3 py-2 text-center"
                       >
-                        📂 Open Portfolio
+                        ⭐ Watchlist
                       </Link>
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 gap-2">
+                    <div className="bg-zinc-800 border border-zinc-700 rounded-2xl p-4">
+                      <div className="mb-3 text-sm text-white">
+                        <div className="font-semibold">{session.user.name}</div>
+                        <div className="text-zinc-400 text-xs">{session.user.email}</div>
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        <Link
+                          href="/profile"
+                          onClick={() => setMenuOpen(false)}
+                          className="block px-3 py-2 hover:bg-zinc-700 rounded"
+                        >
+                          Account / Profile
+                        </Link>
+                        <Link
+                          href="/notifications"
+                          onClick={() => setMenuOpen(false)}
+                          className="block px-3 py-2 hover:bg-zinc-700 rounded"
+                        >
+                          Notifications
+                        </Link>
+                        <button
+                          onClick={() => {
+                            setMenuOpen(false);
+                            signOut();
+                          }}
+                          className="w-full text-left text-red-400 hover:text-white px-3 py-2 hover:bg-red-600 rounded transition"
+                        >
+                          Log out
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
                     <Link
-                      href="/watchlist"
+                      href="/login"
                       onClick={() => setMenuOpen(false)}
-                      className="bg-zinc-800 text-white rounded-lg px-3 py-2 text-center"
+                      className="text-sm px-4 py-2 border border-zinc-600 rounded-md hover:bg-zinc-700 transition text-white text-center"
                     >
-                      ⭐ Watchlist
+                      Login
+                    </Link>
+                    <Link
+                      href="/register"
+                      onClick={() => setMenuOpen(false)}
+                      className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition text-center"
+                    >
+                      Register
                     </Link>
                   </div>
-
-                  <div className="bg-zinc-800 border border-zinc-700 rounded-2xl p-4">
-                    <div className="mb-3 text-sm text-white">
-                      <div className="font-semibold">{session.user.name}</div>
-                      <div className="text-zinc-400 text-xs">{session.user.email}</div>
-                    </div>
-                    <div className="space-y-2 text-sm">
-                      <Link
-                        href="/profile"
-                        onClick={() => setMenuOpen(false)}
-                        className="block px-3 py-2 hover:bg-zinc-700 rounded"
-                      >
-                        Account / Profile
-                      </Link>
-                      <Link
-                        href="/notifications"
-                        onClick={() => setMenuOpen(false)}
-                        className="block px-3 py-2 hover:bg-zinc-700 rounded"
-                      >
-                        Notifications
-                      </Link>
-                      <button
-                        onClick={() => {
-                          setMenuOpen(false);
-                          signOut();
-                        }}
-                        className="w-full text-left text-red-400 hover:text-white px-3 py-2 hover:bg-red-600 rounded transition"
-                      >
-                        Log out
-                      </button>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  <Link
-                    href="/login"
-                    onClick={() => setMenuOpen(false)}
-                    className="text-sm px-4 py-2 border border-zinc-600 rounded-md hover:bg-zinc-700 transition text-white text-center"
-                  >
-                    Login
-                  </Link>
-                  <Link
-                    href="/register"
-                    onClick={() => setMenuOpen(false)}
-                    className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition text-center"
-                  >
-                    Register
-                  </Link>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
             </motion.aside>
           </>
         )}
@@ -530,7 +548,6 @@ export default function NavBar() {
   );
 }
 
-
 function SearchModal({
   open,
   onClose,
@@ -544,9 +561,9 @@ function SearchModal({
   onClose: () => void;
   query: string;
   setQuery: (v: string) => void;
-  coins: MarketCoin[];  
-  trending: MarketCoin[];  
-  onSelect: (c: { id: string }) => void;
+  coins: MarketCoin[];
+  trending: MarketCoin[];
+  onSelect: (c: MarketCoin) => void; 
 }) {
   const [highlight, setHighlight] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
